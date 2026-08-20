@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="目标学校A资料索引演示版">
-  <title>学校资料库 1.0｜乐读</title>
+  <meta name="referrer" content="no-referrer">
+  <meta name="description" content="目标学校A两人资料库">
+  <title>学校资料库｜乐读</title>
   <style>
     :root {
       --paper: #f3f0e8;
@@ -37,12 +38,14 @@
     }
 
     button,
-    input { font: inherit; }
+    input,
+    select { font: inherit; }
     button { color: inherit; }
 
     a:focus-visible,
     button:focus-visible,
-    input:focus-visible {
+    input:focus-visible,
+    select:focus-visible {
       outline: 3px solid var(--yellow);
       outline-offset: 3px;
     }
@@ -323,6 +326,91 @@
       font-size: 12px;
     }
 
+    .upload-panel {
+      padding: 22px;
+      background: rgba(255, 253, 248, .88);
+      border: 1px solid var(--line);
+      border-top: 4px solid var(--red);
+      box-shadow: var(--shadow);
+    }
+
+    .upload-form {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1.5fr;
+      gap: 15px;
+    }
+
+    .form-field label {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--ink-soft);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .06em;
+    }
+
+    .form-field input,
+    .form-field select {
+      width: 100%;
+      min-height: 44px;
+      padding: 0 11px;
+      color: var(--ink);
+      background: var(--white);
+      border: 1px solid var(--ink);
+      border-radius: 0;
+    }
+
+    .form-field input[type="file"] {
+      padding: 9px 11px;
+    }
+
+    .file-field { grid-column: span 2; }
+
+    .form-actions {
+      display: flex;
+      align-items: flex-end;
+    }
+
+    .primary-button,
+    .action-button {
+      min-height: 38px;
+      padding: 0 12px;
+      border: 1px solid var(--ink);
+      cursor: pointer;
+    }
+
+    .primary-button {
+      width: 100%;
+      min-height: 44px;
+      color: var(--white);
+      background: var(--ink);
+      font-weight: 700;
+    }
+
+    .action-button { background: transparent; }
+    .action-button:hover { background: var(--paper-deep); }
+    .action-button.danger { color: var(--red-dark); border-color: var(--red-dark); }
+
+    button:disabled,
+    input:disabled,
+    select:disabled {
+      cursor: not-allowed;
+      opacity: .56;
+    }
+
+    .upload-note,
+    .notice {
+      margin: 13px 0 0;
+      color: var(--ink-soft);
+      font-size: 11px;
+      line-height: 1.65;
+    }
+
+    .notice:empty { display: none; }
+    .notice.error { color: var(--red-dark); }
+    .notice.success { color: #1f6654; }
+    .catalog-panel > .notice { padding: 0 20px; }
+
     .catalog-panel {
       background: rgba(255, 253, 248, .88);
       border: 1px solid var(--line);
@@ -427,7 +515,7 @@
 
     table {
       width: 100%;
-      min-width: 930px;
+      min-width: 1050px;
       border-collapse: collapse;
     }
 
@@ -457,6 +545,13 @@
       font: 700 15px/1.5 var(--display);
     }
 
+    .doc-meta {
+      display: block;
+      margin-top: 4px;
+      color: var(--ink-soft);
+      font: 10px/1.5 var(--body);
+    }
+
     .category-tag,
     .status-tag,
     .demo-link-mark {
@@ -479,6 +574,20 @@
     }
 
     .source-link:hover { color: var(--red); }
+
+    .status-select {
+      min-height: 34px;
+      padding: 0 8px;
+      color: var(--ink);
+      background: var(--white);
+      border: 1px solid var(--line);
+    }
+
+    .row-actions {
+      display: flex;
+      gap: 7px;
+      white-space: nowrap;
+    }
 
     .demo-link-mark {
       margin-left: 4px;
@@ -603,6 +712,8 @@
       .catalog-toolbar { align-items: flex-start; }
       .school-summary,
       .catalog-toolbar { flex-direction: column; }
+      .upload-form { grid-template-columns: 1fr; }
+      .file-field { grid-column: auto; }
       .school-stamp { width: 100%; }
       .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .filter-note { max-width: none; text-align: left; }
@@ -643,14 +754,15 @@
       <p class="side-label">资料索引</p>
       <nav class="side-nav">
         <a class="active" href="#school" data-index="01" data-short="校"><span>学校概况</span></a>
-        <a href="#catalog" data-index="02" data-short="资"><span>资料清单</span></a>
-        <a href="#missing" data-index="03" data-short="缺"><span>缺失资料</span></a>
+        <a href="#upload" data-index="02" data-short="传"><span>上传资料</span></a>
+        <a href="#catalog" data-index="03" data-short="资"><span>资料清单</span></a>
+        <a href="#missing" data-index="04" data-short="缺"><span>缺失资料</span></a>
       </nav>
       <div class="side-note">
         <span>资料库 1.0</span>
-        <p>先看有什么，<br>再找在哪里。</p>
+        <p>两人共享维护，<br>资料私有保存。</p>
       </div>
-      <span class="mobile-context">目标学校A · 演示资料</span>
+      <span class="mobile-context">目标学校A · 两人资料库</span>
     </aside>
 
     <main>
@@ -659,7 +771,7 @@
           <span class="eyebrow">SCHOOL ARCHIVE · 1.0</span>
           <h1>学校资料库</h1>
         </div>
-        <span class="demo-badge">匿名演示数据</span>
+        <span class="demo-badge">共享密钥保护</span>
       </header>
 
       <section id="school" aria-labelledby="school-title">
@@ -667,7 +779,7 @@
           <div class="school-copy">
             <span class="eyebrow">目标学校 / 01</span>
             <h2 id="school-title">目标学校A</h2>
-            <p>单校资料索引 · 当前聚焦八至九年级。所有名称、负责人及链接均为演示信息，不包含真实学生或家长资料。</p>
+            <p>单校资料索引 · 当前聚焦八至九年级。资料 API 由共享管理密钥保护，真实文件保存在私有对象存储中。</p>
           </div>
           <div class="school-stamp">
             <span>最近资料更新</span>
@@ -682,10 +794,59 @@
         </div>
       </section>
 
+      <section class="section" id="upload" aria-labelledby="upload-title">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">02 · DOCUMENT UPLOAD</span>
+            <h2 id="upload-title">上传资料</h2>
+          </div>
+          <p>仅支持 PDF、DOCX、XLSX · 单文件最大 50MB</p>
+        </div>
+        <div class="upload-panel">
+          <form class="upload-form" id="uploadForm">
+            <div class="form-field">
+              <label for="titleInput">资料标题</label>
+              <input id="titleInput" name="title" maxlength="200" required>
+            </div>
+            <div class="form-field">
+              <label for="categoryInput">资料分类</label>
+              <select id="categoryInput" name="category" required>
+                <option value="学校信息">学校信息</option>
+                <option value="教学进度">教学进度</option>
+                <option value="试卷资料">试卷资料</option>
+                <option value="家长与情报">家长与情报</option>
+                <option value="活动与产品">活动与产品</option>
+              </select>
+            </div>
+            <div class="form-field">
+              <label for="scopeInput">年级 / 学科</label>
+              <input id="scopeInput" name="scope" maxlength="100" placeholder="例如：八年级 / 物理" required>
+            </div>
+            <div class="form-field">
+              <label for="uploaderInput">上传者（手动声明）</label>
+              <select id="uploaderInput" name="uploaded_by" required>
+                <option value="人员1（我）">人员1（我）</option>
+                <option value="人员2（上级）">人员2（上级）</option>
+              </select>
+            </div>
+            <div class="form-field file-field">
+              <label for="fileInput">选择文件</label>
+              <input id="fileInput" name="file" type="file" accept=".pdf,.docx,.xlsx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+            </div>
+            <div class="form-actions">
+              <button class="primary-button" id="uploadButton" type="submit">上传并设为待确认</button>
+            </div>
+          </form>
+          <p class="upload-note">上传者由使用者手动选择，只表示声明身份，不属于可核验的身份审计。</p>
+          <p class="notice" id="uploadMessage" role="status" aria-live="polite"></p>
+          <p class="notice" id="accessMessage" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
       <section class="section" id="catalog" aria-labelledby="catalog-title">
         <div class="section-heading">
           <div>
-            <span class="eyebrow">02 · DOCUMENT INDEX</span>
+            <span class="eyebrow">03 · DOCUMENT INDEX</span>
             <h2 id="catalog-title">资料清单</h2>
           </div>
           <p>输入关键词，或按五类资料快速筛选</p>
@@ -699,13 +860,14 @@
                 <input id="searchInput" type="search" placeholder="搜索标题、年级 / 学科、负责人…" autocomplete="off">
               </div>
             </div>
-            <p class="filter-note">资料原文均为演示链接，并在链接旁明确标记。</p>
+            <p class="filter-note">资料字段来自真实 API；下载始终通过密钥校验并强制保存为附件。</p>
           </div>
           <div class="category-filters" id="categoryFilters" aria-label="资料分类筛选"></div>
           <div class="result-line" aria-live="polite">
             <span>找到 <strong id="resultCount">0</strong> 份资料</span>
             <span id="filterSummary">全部分类</span>
           </div>
+          <p class="notice" id="actionMessage" role="status" aria-live="polite"></p>
           <div class="table-wrap">
             <table>
               <thead>
@@ -713,18 +875,18 @@
                   <th scope="col">标题</th>
                   <th scope="col">分类</th>
                   <th scope="col">年级 / 学科</th>
-                  <th scope="col">更新时间</th>
-                  <th scope="col">负责人</th>
+                  <th scope="col">上传时间</th>
+                  <th scope="col">上传者</th>
                   <th scope="col">确认状态</th>
-                  <th scope="col">原文链接</th>
+                  <th scope="col">操作</th>
                 </tr>
               </thead>
               <tbody id="documentRows"></tbody>
             </table>
           </div>
           <div class="empty-state" id="emptyState">
-            <strong>没有匹配的资料</strong>
-            <span>请更换关键词或选择其他分类。</span>
+            <strong id="emptyTitle">暂无资料</strong>
+            <span id="emptyCopy">上传第一份资料后会显示在这里。</span>
           </div>
         </div>
       </section>
@@ -732,7 +894,7 @@
       <section class="section" id="missing" aria-labelledby="missing-title">
         <div class="section-heading">
           <div>
-            <span class="eyebrow">03 · MISSING DOCUMENTS</span>
+            <span class="eyebrow">04 · MISSING DOCUMENTS</span>
             <h2 id="missing-title">缺失资料</h2>
           </div>
           <p>4 项尚未收集 · 直接可见</p>
@@ -763,78 +925,341 @@
 
       <footer class="footer">
         <span>学校资料库 1.0 · 单校资料索引</span>
-        <span>匿名演示数据 · 原文链接为演示地址 · 2026.08.18</span>
+        <span>两人共享管理 · 上传者为手动声明 · 2026.08.20</span>
       </footer>
     </main>
   </div>
 
   <script>
-    const documents = [
-      { title: '目标学校A基础档案', category: '学校信息', scope: '全校 / 综合', updated: '2026-08-18', owner: '校区资料员', status: '已确认', url: 'https://example.com/' },
-      { title: '2026秋季校历及考试安排', category: '学校信息', scope: '全校 / 综合', updated: '2026-08-15', owner: '教务联络人', status: '已确认', url: 'https://example.com/' },
-      { title: '八年级物理教学进度表', category: '教学进度', scope: '八年级 / 物理', updated: '2026-08-17', owner: '物理教研组', status: '已确认', url: 'https://example.com/' },
-      { title: '九年级数学章节进度', category: '教学进度', scope: '九年级 / 数学', updated: '2026-08-14', owner: '数学教研组', status: '待确认', url: 'https://example.com/' },
-      { title: '八年级物理期末试卷', category: '试卷资料', scope: '八年级 / 物理', updated: '2026-08-12', owner: '物理教研组', status: '已确认', url: 'https://example.com/' },
-      { title: '九年级数学开学摸底试卷', category: '试卷资料', scope: '九年级 / 数学', updated: '2026-08-11', owner: '数学教研组', status: '待确认', url: 'https://example.com/' },
-      { title: '八年级家长常见问题摘要', category: '家长与情报', scope: '八年级 / 全科', updated: '2026-08-16', owner: '校区资料员', status: '已确认', url: 'https://example.com/' },
-      { title: '校园开放日家长反馈纪要', category: '家长与情报', scope: '全年级 / 综合', updated: '2026-08-13', owner: '活动负责人', status: '待确认', url: 'https://example.com/' },
-      { title: '秋季学习规划讲座资料', category: '活动与产品', scope: '八年级 / 全科', updated: '2026-08-10', owner: '产品负责人', status: '已确认', url: 'https://example.com/' },
-      { title: '物理实验营活动方案', category: '活动与产品', scope: '八年级 / 物理', updated: '2026-08-09', owner: '活动负责人', status: '待确认', url: 'https://example.com/' }
-    ];
-
-    const categories = ['全部', '学校信息', '教学进度', '试卷资料', '家长与情报', '活动与产品'];
+    const CATEGORIES = ['全部', '学校信息', '教学进度', '试卷资料', '家长与情报', '活动与产品'];
+    const STORAGE_KEY = 'school_archive_admin_key';
+    const uploadForm = document.querySelector('#uploadForm');
+    const uploadButton = document.querySelector('#uploadButton');
+    const uploadMessage = document.querySelector('#uploadMessage');
+    const accessMessage = document.querySelector('#accessMessage');
+    const actionMessage = document.querySelector('#actionMessage');
     const searchInput = document.querySelector('#searchInput');
     const categoryFilters = document.querySelector('#categoryFilters');
     const documentRows = document.querySelector('#documentRows');
+    const tableWrap = document.querySelector('.table-wrap');
     const emptyState = document.querySelector('#emptyState');
+    const pageUrl = new URL(window.location.href);
+    const hasHashKey = pageUrl.hash.startsWith('#key=');
+    const hashKey = hasHashKey
+      ? new URLSearchParams(pageUrl.hash.slice(1)).get('key')
+      : '';
+    const hasKeyInAddress = pageUrl.searchParams.has('key') || hasHashKey;
+    const urlKey = hashKey || pageUrl.searchParams.get('key');
+    let documents = [];
     let selectedCategory = '全部';
+    let hasAccess = false;
+    let adminKey = '';
 
-    document.querySelector('#totalCount').textContent = documents.length;
-    document.querySelector('#confirmedCount').textContent = documents.filter(document => document.status === '已确认').length;
-    document.querySelector('#pendingCount').textContent = documents.filter(document => document.status === '待确认').length;
-    document.querySelector('#latestUpdate').textContent = documents.map(document => document.updated).sort().at(-1).replaceAll('-', '.');
-
-    categoryFilters.innerHTML = categories.map(category => {
-      const count = category === '全部' ? documents.length : documents.filter(document => document.category === category).length;
-      return `<button class="filter-button${category === '全部' ? ' active' : ''}" type="button" data-category="${category}">${category}<span>${count}</span></button>`;
-    }).join('');
-
-    function renderDocuments() {
-      const keyword = searchInput.value.trim().toLowerCase();
-      const filtered = documents.filter(document => {
-        const matchesCategory = selectedCategory === '全部' || document.category === selectedCategory;
-        const matchesKeyword = !keyword || Object.values(document).some(value => value.toLowerCase().includes(keyword));
-        return matchesCategory && matchesKeyword;
-      });
-
-      documentRows.innerHTML = filtered.map(document => `
-        <tr>
-          <td class="doc-title">${document.title}</td>
-          <td><span class="category-tag">${document.category}</span></td>
-          <td>${document.scope}</td>
-          <td>${document.updated}</td>
-          <td>${document.owner}</td>
-          <td><span class="status-tag ${document.status === '已确认' ? 'confirmed' : 'pending'}">${document.status}</span></td>
-          <td><a class="source-link" href="${document.url}" target="_blank" rel="noopener noreferrer" aria-label="查看${document.title}的演示原文">查看原文<span class="demo-link-mark">演示</span></a></td>
-        </tr>
-      `).join('');
-
-      document.querySelector('#resultCount').textContent = filtered.length;
-      document.querySelector('#filterSummary').textContent = keyword ? `${selectedCategory} · 关键词“${searchInput.value.trim()}”` : selectedCategory === '全部' ? '全部分类' : selectedCategory;
-      document.querySelector('.table-wrap').hidden = filtered.length === 0;
-      emptyState.style.display = filtered.length === 0 ? 'block' : 'none';
+    try {
+      adminKey = urlKey || localStorage.getItem(STORAGE_KEY) || '';
+      if (urlKey) localStorage.setItem(STORAGE_KEY, urlKey);
+    } catch {
+      adminKey = urlKey || '';
     }
 
-    categoryFilters.addEventListener('click', event => {
-      const button = event.target.closest('button[data-category]');
-      if (!button) return;
-      selectedCategory = button.dataset.category;
-      categoryFilters.querySelectorAll('button').forEach(item => item.classList.toggle('active', item === button));
+    if (pageUrl.searchParams.has('key')) {
+      pageUrl.searchParams.delete('key');
+    }
+    if (hasHashKey) pageUrl.hash = '';
+    if (hasKeyInAddress) history.replaceState(null, '', `${pageUrl.pathname}${pageUrl.search}${pageUrl.hash}`);
+
+    class ApiError extends Error {
+      constructor(message, status) {
+        super(message);
+        this.status = status;
+      }
+    }
+
+    function showMessage(element, message = '', type = '') {
+      element.textContent = message;
+      element.className = `notice${type ? ` ${type}` : ''}`;
+    }
+
+    function setFormDisabled(disabled) {
+      uploadForm.querySelectorAll('input, select, button').forEach(control => {
+        control.disabled = disabled;
+      });
+    }
+
+    function setAccessState(allowed, message, type) {
+      hasAccess = allowed;
+      setFormDisabled(!allowed);
+      showMessage(accessMessage, message, type);
+    }
+
+    async function apiFetch(path, options = {}) {
+      const headers = new Headers(options.headers || {});
+      if (adminKey) headers.set('Authorization', `Bearer ${adminKey}`);
+      const response = await fetch(path, { ...options, headers, cache: 'no-store' });
+      if (response.ok) return response;
+
+      let message = `请求失败（${response.status}）。`;
+      try {
+        const data = await response.json();
+        if (data.error) message = data.error;
+      } catch {
+        // Keep the status-based message for non-JSON platform errors.
+      }
+
+      if (response.status === 401) {
+        adminKey = '';
+        try { localStorage.removeItem(STORAGE_KEY); } catch { /* Storage may be unavailable. */ }
+        setAccessState(false, message, 'error');
+      }
+      throw new ApiError(message, response.status);
+    }
+
+    function formatDate(value) {
+      if (!value) return '—';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '—';
+      return new Intl.DateTimeFormat('zh-CN', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit'
+      }).format(date);
+    }
+
+    function formatSize(bytes) {
+      if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))}KB`;
+      return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+    }
+
+    function renderStats() {
+      document.querySelector('#totalCount').textContent = documents.length;
+      document.querySelector('#confirmedCount').textContent = documents.filter(document => document.status === '已确认').length;
+      document.querySelector('#pendingCount').textContent = documents.filter(document => document.status === '待确认').length;
+      const latest = documents.map(document => document.uploaded_at).filter(Boolean).sort().at(-1);
+      document.querySelector('#latestUpdate').textContent = latest ? formatDate(latest) : '—';
+    }
+
+    function renderFilters() {
+      categoryFilters.replaceChildren(...CATEGORIES.map(category => {
+        const button = document.createElement('button');
+        const count = category === '全部'
+          ? documents.length
+          : documents.filter(document => document.category === category).length;
+        button.className = `filter-button${category === selectedCategory ? ' active' : ''}`;
+        button.type = 'button';
+        button.dataset.category = category;
+        button.textContent = category;
+        const countLabel = document.createElement('span');
+        countLabel.textContent = count;
+        button.append(countLabel);
+        button.addEventListener('click', () => {
+          selectedCategory = category;
+          renderFilters();
+          renderDocuments();
+        });
+        return button;
+      }));
+    }
+
+    function cell(text, className = '') {
+      const item = document.createElement('td');
+      item.textContent = text;
+      if (className) item.className = className;
+      return item;
+    }
+
+    async function updateStatus(document, select) {
+      const previousStatus = document.status;
+      select.disabled = true;
+      showMessage(actionMessage, '正在更新确认状态…');
+      try {
+        await apiFetch(`/api/documents/${encodeURIComponent(document.id)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: select.value })
+        });
+        document.status = select.value;
+        renderStats();
+        showMessage(actionMessage, '确认状态已更新。', 'success');
+      } catch (error) {
+        select.value = previousStatus;
+        showMessage(actionMessage, error.message || '状态更新失败。', 'error');
+      } finally {
+        select.disabled = !hasAccess;
+      }
+    }
+
+    async function downloadDocument(document, button) {
+      button.disabled = true;
+      showMessage(actionMessage, `正在下载“${document.title}”…`);
+      try {
+        const response = await apiFetch(`/api/documents/${encodeURIComponent(document.id)}/file`);
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        const link = documentNode('a');
+        link.href = objectUrl;
+        link.download = document.original_name;
+        window.document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+        showMessage(actionMessage, '下载已开始。', 'success');
+      } catch (error) {
+        showMessage(actionMessage, error.message || '下载失败。', 'error');
+      } finally {
+        button.disabled = !hasAccess;
+      }
+    }
+
+    async function deleteDocument(document, button) {
+      const confirmed = window.confirm(`确定删除“${document.title}”吗？\n\n资料会从列表移除，私有文件会保留以避免意外丢失。`);
+      if (!confirmed) return;
+      button.disabled = true;
+      showMessage(actionMessage, '正在删除资料…');
+      try {
+        await apiFetch(`/api/documents/${encodeURIComponent(document.id)}`, { method: 'DELETE' });
+        documents = documents.filter(item => item.id !== document.id);
+        renderAll();
+        showMessage(actionMessage, '资料已从列表删除。', 'success');
+      } catch (error) {
+        showMessage(actionMessage, error.message || '删除失败。', 'error');
+        button.disabled = !hasAccess;
+      }
+    }
+
+    function documentNode(tagName) {
+      return window.document.createElement(tagName);
+    }
+
+    function renderRow(document) {
+      const row = documentNode('tr');
+      const titleCell = cell(document.title, 'doc-title');
+      const metadata = documentNode('span');
+      metadata.className = 'doc-meta';
+      metadata.textContent = `${document.original_name} · ${formatSize(document.size_bytes)}`;
+      titleCell.append(metadata);
+
+      const categoryCell = documentNode('td');
+      const category = documentNode('span');
+      category.className = 'category-tag';
+      category.textContent = document.category;
+      categoryCell.append(category);
+
+      const statusCell = documentNode('td');
+      const status = documentNode('select');
+      status.className = 'status-select';
+      status.setAttribute('aria-label', `修改“${document.title}”的确认状态`);
+      ['待确认', '已确认'].forEach(value => {
+        const option = documentNode('option');
+        option.value = value;
+        option.textContent = value;
+        status.append(option);
+      });
+      status.value = document.status;
+      status.disabled = !hasAccess;
+      status.addEventListener('change', () => updateStatus(document, status));
+      statusCell.append(status);
+
+      const actionsCell = documentNode('td');
+      const actions = documentNode('div');
+      actions.className = 'row-actions';
+      const download = documentNode('button');
+      download.className = 'action-button';
+      download.type = 'button';
+      download.textContent = '下载';
+      download.disabled = !hasAccess;
+      download.addEventListener('click', () => downloadDocument(document, download));
+      const remove = documentNode('button');
+      remove.className = 'action-button danger';
+      remove.type = 'button';
+      remove.textContent = '删除';
+      remove.disabled = !hasAccess;
+      remove.addEventListener('click', () => deleteDocument(document, remove));
+      actions.append(download, remove);
+      actionsCell.append(actions);
+
+      row.append(
+        titleCell,
+        categoryCell,
+        cell(document.scope),
+        cell(formatDate(document.uploaded_at)),
+        cell(document.uploaded_by),
+        statusCell,
+        actionsCell
+      );
+      return row;
+    }
+
+    function renderDocuments() {
+      const rawKeyword = searchInput.value.trim();
+      const keyword = rawKeyword.toLocaleLowerCase('zh-CN');
+      const filtered = documents.filter(document => {
+        const matchesCategory = selectedCategory === '全部' || document.category === selectedCategory;
+        const searchable = [document.title, document.category, document.scope, document.uploaded_by, document.original_name]
+          .join(' ')
+          .toLocaleLowerCase('zh-CN');
+        return matchesCategory && (!keyword || searchable.includes(keyword));
+      });
+
+      documentRows.replaceChildren(...filtered.map(renderRow));
+      document.querySelector('#resultCount').textContent = filtered.length;
+      document.querySelector('#filterSummary').textContent = rawKeyword
+        ? `${selectedCategory} · 关键词“${rawKeyword}”`
+        : selectedCategory === '全部' ? '全部分类' : selectedCategory;
+      tableWrap.hidden = filtered.length === 0;
+      emptyState.style.display = filtered.length === 0 ? 'block' : 'none';
+      document.querySelector('#emptyTitle').textContent = documents.length ? '没有匹配的资料' : '暂无资料';
+      document.querySelector('#emptyCopy').textContent = documents.length
+        ? '请更换关键词或选择其他分类。'
+        : '上传第一份资料后会显示在这里。';
+    }
+
+    function renderAll() {
+      renderStats();
+      renderFilters();
       renderDocuments();
+    }
+
+    async function loadDocuments() {
+      setFormDisabled(true);
+      showMessage(accessMessage, '正在连接资料库…');
+      try {
+        const response = await apiFetch('/api/documents');
+        const data = await response.json();
+        documents = Array.isArray(data.documents) ? data.documents : [];
+        setAccessState(true, '管理密钥有效，已连接资料库。', 'success');
+      } catch (error) {
+        documents = [];
+        setAccessState(false, error.message || '无法连接资料库，请刷新页面重试。', 'error');
+      }
+      renderAll();
+    }
+
+    uploadForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!hasAccess) return;
+      setFormDisabled(true);
+      uploadButton.textContent = '正在上传…';
+      showMessage(uploadMessage, '文件正在安全上传，请勿关闭页面。');
+      try {
+        const response = await apiFetch('/api/documents', {
+          method: 'POST',
+          body: new FormData(uploadForm)
+        });
+        const data = await response.json();
+        documents.unshift(data.document);
+        uploadForm.reset();
+        renderAll();
+        showMessage(uploadMessage, '上传完成，新资料状态为“待确认”。', 'success');
+      } catch (error) {
+        showMessage(uploadMessage, error.message || '上传失败。', 'error');
+      } finally {
+        uploadButton.textContent = '上传并设为待确认';
+        setFormDisabled(!hasAccess);
+      }
     });
 
     searchInput.addEventListener('input', renderDocuments);
-    renderDocuments();
+    renderAll();
+    loadDocuments();
 
     const navLinks = [...document.querySelectorAll('.side-nav a')];
     const observer = new IntersectionObserver(entries => {
