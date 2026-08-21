@@ -1236,13 +1236,14 @@
     uploadForm.addEventListener('submit', async event => {
       event.preventDefault();
       if (!hasAccess) return;
+      const formData = new FormData(uploadForm);
       setFormDisabled(true);
       uploadButton.textContent = '正在上传…';
       showMessage(uploadMessage, '文件正在安全上传，请勿关闭页面。');
       try {
         const response = await apiFetch('/api/documents', {
           method: 'POST',
-          body: new FormData(uploadForm)
+          body: formData
         });
         const data = await response.json();
         documents.unshift(data.document);
