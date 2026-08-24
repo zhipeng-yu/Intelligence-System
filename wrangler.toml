@@ -2,6 +2,9 @@ name = "ledu-school-archive"
 pages_build_output_dir = "."
 compatibility_date = "2026-08-20"
 
+[ai]
+binding = "AI"
+
 [[d1_databases]]
 binding = "DB"
 database_name = "ledu-school-archive"

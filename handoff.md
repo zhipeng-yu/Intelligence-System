@@ -1,75 +1,78 @@
-# 两人资料库交接
+# 学校资料库运维交接
 
 更新日期：2026-08-24
 
-## 已完成
+## 当前状态
 
-- 生产临时地址：<https://ledu-school-archive.pages.dev>
+- 生产地址：<https://ledu-school-archive.pages.dev>
 - Pages 项目：`ledu-school-archive`
 - D1：`ledu-school-archive`（`1ba7ee18-968d-4598-aad4-8f667454563e`）
 - 私有 R2 bucket：`ledu-school-archive`
-- Pages Secret：`ADMIN_KEY`
-- 管理链接仅保存在本机 `.wrangler/access-url.txt`；密钥同时保存在被忽略的 `.dev.vars`，均未提交。
-- 仓库已实现学校画像 1.0 的本地可验证版本；生产仍运行 2026-08-20 的资料库版本，尚未应用 `0002_create_profile_values.sql` 或部署本次页面与 Functions。
+- 已配置的旧版 Secret：`ADMIN_KEY`
+- 仓库 `main` 已实现学校画像 2.0；生产仍运行旧资料库版本。
+- 远端 D1 尚未应用 `0002_create_profile_values.sql`，Pages 尚未部署本次代码。
 
-下一阶段已经确认改为学校画像 2.0 简化重构：删除 36 字段、权重、候选和双确认；公司内部教培老师可公开查看和上传，Doubao-Seed-2.0-lite 自动整理为八张画像卡片。最终产品方案、外部数据流、权限与验收要求以 `school-profile-handoff.md` 为准；本文件下方“固定边界”描述的是当前生产版本，不得误当成 2.0 目标。
+管理密钥和管理链接只保存在被 Git 忽略的本地文件或 Cloudflare Secret 中，不得写入仓库、聊天、日志、截图或普通文档。
 
-代码只在 `main` 维护并正常推送 `origin/main`；禁止强推，遇到未知远端变化立即停止。
+## 2.0 运行结构
 
-每次任务完成前都要检查并精简更新 `readme.md`、本文件、`AGENTS.md` 和相关专项交接文档，删除已经失效的说明；验证通过后默认提交本地 `main`，重新核对远端并正常快进推送 `origin/main`。内容仍准确时无需为了制造差异而改写；推送不代表授权生产部署或远端迁移。
+- 单个原生 `index.html`
+- Cloudflare Pages Functions
+- D1：文档元数据、八张画像卡片、隐藏历史
+- 私有 R2：原文件，使用随机对象键
+- Workers AI `AI` binding：`toMarkdown`
+- 火山方舟 Responses API：`doubao-seed-2-0-lite-260215`
+- Turnstile：公开上传校验
 
-## 固定边界
+`0001_create_documents.sql` 是已上线的旧基线，不能重写；尚未上线的 `0002_create_profile_values.sql` 会把旧文档表迁移为 2.0 状态并创建八卡片及历史表。旧文档的文件与核心元数据会保留。
 
-- 单学校、五类资料：学校信息、教学进度、试卷资料、家长与情报、活动与产品。
-- 只有“人员1（我）”和“人员2（上级）”；无注册、登录、手机号、部门、角色或用户后台。
-- 两人共享随机管理密钥，权限完全相同。上传者是手动声明，不是身份审计。
-- 只接收 PDF、DOCX、XLSX，单文件最大 50MB；服务端校验扩展名、MIME、文件头和大小。
-- 文件保存在私有 R2，使用随机对象键；下载强制附件并设置 `nosniff`。
-- 元数据保存在 D1；新资料默认为“待确认”；删除是 D1 软删除，R2 对象保留以避免跨服务失败造成数据丢失。
-- 不实现 AI、多校、全文解析、通知、病毒扫描、公司域名或 ICP。
-- 画像 V1 固定为一所学校、当前学期和一个试点年级/学科，共 36 个字段；不保存学生、家长个人明细。
+## 权限与安全边界
 
-## API
+- 公开：查看画像、完成度、来源文件名、最近更新、上传资料、触发每份文件唯一一次的自动整理。
+- 管理链接：人工编辑并锁定卡片、解锁、下载原文件、软删除、重试失败整理。
+- 公开上传必须通过 Turnstile；同一网络散列每小时最多 5 份。
+- 服务端继续校验扩展名、MIME、文件头和 50MB 上限。
+- 原文件不公开，下载强制附件并设置 `nosniff`；删除只软删除 D1 记录。
+- AI 输出必须经过八个 section key 白名单、去重和 4000 字长度校验；资料正文被视为不可信数据，不能改变系统指令。
+- 不保存明文 IP，不安装方舟 SDK，不使用知识库、向量库、队列或额外服务层。
 
-全部接口都要求 `Authorization: Bearer <ADMIN_KEY>`：
+## 发布前配置
 
-- `GET /api/documents`
-- `POST /api/documents`
-- `GET /api/documents/:id/file`
-- `PATCH /api/documents/:id`
-- `DELETE /api/documents/:id`
-- `GET /api/profile`
-- `POST /api/profile`
-- `PATCH /api/profile/:id`
-- `DELETE /api/profile/:id`
+Cloudflare 生产环境需要：
 
-写入顺序为 R2 后 D1；D1 写入失败时删除刚写入的 R2 对象。用户字段只通过安全 DOM API 渲染。
+- Secret：`ADMIN_KEY`
+- Secret：`ARK_API_KEY`
+- Secret：`TURNSTILE_SECRET`
+- 公开变量：`TURNSTILE_SITE_KEY`
+- Workers AI binding：`AI`
+- 已有 D1 `DB` 与私有 R2 `BUCKET` bindings
 
-画像候选直接关联一份未删除资料和来源定位。新候选固定为“待确认”；确认候选前来源资料也必须确认。画像按字段封顶计分：缺失 0、待确认 0.25、已确认 1、冲突 0、过期 0；重复证据不叠加，两个不同的有效已确认值自动形成冲突。
+发布前应在安全终端中配置或核对这些值，不得把值放进命令历史以外的可见输出。
 
-## 已验证
+## 发布顺序
 
-- `node --test tests/api.test.mjs`：5 项通过。
-- `node --test tests/profile.test.mjs`：5 项通过。
-- Pages Functions 构建和 D1 迁移通过。
-- 无密钥和错误密钥不能读取、上传、下载、修改或删除资料。
-- PDF、DOCX、XLSX 可上传；错误扩展名、MIME、文件头和超过 50MB 均由服务端拒绝。
-- Edge 验证了读取、搜索、五类筛选、空结果、状态修改、下载提示、删除确认、响应式布局、键盘焦点和无脚本错误。
-- 生产环境完成 R2 上传、默认待确认、附件下载、内容一致、状态修改、软删除闭环；测试数据已清空。
-- 当前桌面截图：`artifacts/school-archive-desktop.png`。
-- 本地真实 API 闭环已验证：零资料 0%，候选 1.5%，确认 6%，冲突和来源软删除回退 0%，来源未确认时服务端以 409 拒绝确认候选。
-- 学校画像 1.0 已在电脑端 Microsoft Edge 完成本地验收：上传资料、登记候选、来源未确认时拦截、确认后按固定权重从 1.5% 增至 6%、重复候选拦截、冲突/过期/来源退回待确认时回退、搜索与五类筛选均正常；390px 宽度无横向溢出，Tab 焦点轮廓清晰，控制台无警告或错误。桌面截图已更新。
+本次实现与推送不代表生产授权。获得明确发布授权后：
 
-## 运维命令
+1. 再次只读核对本地 `main` 与 `origin/main`。
+2. 安全配置新增 Secret/变量和 Workers AI binding。
+3. 应用远端 D1 迁移。
+4. 部署 Pages。
+5. 用无密钥与管理链接分别做生产冒烟验证；使用无敏感信息的小文件，避免真实学校资料触发首次 AI 验收。
 
 ```powershell
-npx wrangler d1 migrations apply ledu-school-archive --remote
-npx wrangler pages deploy . --project-name ledu-school-archive --branch main
-npx wrangler pages secret put ADMIN_KEY --project-name ledu-school-archive
+npx.cmd wrangler d1 migrations apply ledu-school-archive --remote
+npx.cmd wrangler pages deploy . --project-name ledu-school-archive --branch main
 ```
 
-最后一条用于轮换泄露的管理密钥。轮换后重新生成管理链接并只通过可信渠道发给两名使用者；不要把秘密写入仓库或聊天。
+禁止强推。认证失败、冲突或远端出现未知提交时立即停止。
 
-画像版本首次发布时必须先应用远端 D1 迁移，再部署 Pages；发布前重新核对远端 `main`，并完成浏览器验收。当前未执行任何远端迁移或生产部署。
+## 已完成的本地验证
 
-`*.pages.dev` 在中国大陆的跨境速度和稳定性没有保证；本项目不使用公司域名，也不办理 ICP。
+- `node --test tests/api.test.mjs`
+- `node --test tests/profile.test.mjs`
+- 全新本地 D1 顺序应用 `0001` 与 `0002`
+- Pages Functions 构建
+- 真实本地 D1/R2 的查看、上传、私有下载、人工编辑/解锁和软删除闭环
+- 模拟方舟响应的自动更新、锁定不覆盖、失败保留、管理员重试、输出白名单测试
+
+浏览器验收结果与当前发布边界见 `school-profile-handoff.md`。

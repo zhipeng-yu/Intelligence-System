@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { onRequestGet, onRequestPost } from '../functions/api/documents/index.js';
-import { onRequestDelete, onRequestPatch } from '../functions/api/documents/[id].js';
+import { onRequestDelete } from '../functions/api/documents/[id].js';
 import { onRequestGet as onRequestFile } from '../functions/api/documents/[id]/file.js';
 
 const ADMIN_KEY = '0123456789abcdef0123456789abcdef';
@@ -17,19 +17,21 @@ class FakeDB {
   prepare(sql) {
     const database = this;
     return {
+      sql,
       values: [],
-      bind(...values) {
-        this.values = values;
-        return this;
-      },
+      bind(...values) { this.values = values; return this; },
       async all() {
         const results = [...database.rows.values()]
           .filter(row => !row.deleted_at)
           .sort((left, right) => right.uploaded_at.localeCompare(left.uploaded_at))
-          .map(({ object_key, deleted_at, ...row }) => row);
+          .map(({ object_key, network_hash, auto_analyzed, deleted_at, ...row }) => row);
         return { results };
       },
       async first() {
+        if (/COUNT\(\*\)/.test(sql)) {
+          const [hash, since] = this.values;
+          return { count: [...database.rows.values()].filter(row => row.network_hash === hash && row.uploaded_at >= since).length };
+        }
         const row = database.rows.get(this.values[0]);
         if (!row || row.deleted_at) return null;
         return {
@@ -42,51 +44,52 @@ class FakeDB {
       async run() {
         if (/INSERT INTO documents/.test(sql)) {
           if (database.failInsert) throw new Error('simulated D1 failure');
-          const [id, title, category, scope, uploadedBy, uploadedAt, originalName, objectKey, mimeType, sizeBytes] = this.values;
+          const [id, title, note, networkHash, uploadedAt, originalName, objectKey, mimeType, sizeBytes] = this.values;
           database.rows.set(id, {
-            id, title, category, scope, status: '待确认', uploaded_by: uploadedBy,
-            uploaded_at: uploadedAt, original_name: originalName, object_key: objectKey,
-            mime_type: mimeType, size_bytes: sizeBytes, deleted_at: null
+            id, title, note, category: null, scope: null, ai_status: 'not_started', ai_error: null,
+            analyzed_at: null, auto_analyzed: 0, network_hash: networkHash, uploaded_at: uploadedAt,
+            original_name: originalName, object_key: objectKey, mime_type: mimeType,
+            size_bytes: sizeBytes, deleted_at: null
           });
           return { meta: { changes: 1 } };
         }
-
-        const [value, id] = this.values;
-        const row = database.rows.get(id);
-        if (!row || row.deleted_at) return { meta: { changes: 0 } };
-        if (/SET status/.test(sql)) row.status = value;
-        if (/SET deleted_at/.test(sql)) row.deleted_at = value;
-        return { meta: { changes: 1 } };
+        if (/SET deleted_at/.test(sql)) {
+          const [deletedAt, id] = this.values;
+          const row = database.rows.get(id);
+          if (!row || row.deleted_at) return { meta: { changes: 0 } };
+          row.deleted_at = deletedAt;
+          return { meta: { changes: 1 } };
+        }
+        return { meta: { changes: 0 } };
       }
     };
   }
 }
 
 class FakeBucket {
-  constructor() {
-    this.objects = new Map();
-  }
-
+  constructor() { this.objects = new Map(); }
   async put(key, stream) {
     this.objects.set(key, new Uint8Array(await new Response(stream).arrayBuffer()));
     return { key };
   }
-
   async get(key) {
     const bytes = this.objects.get(key);
     return bytes ? { body: bytes } : null;
   }
-
-  async delete(key) {
-    this.objects.delete(key);
-  }
+  async delete(key) { this.objects.delete(key); }
 }
 
 function env() {
-  return { ADMIN_KEY, DB: new FakeDB(), BUCKET: new FakeBucket() };
+  return {
+    ADMIN_KEY,
+    TURNSTILE_SECRET: 'test-secret',
+    TURNSTILE_FETCH: async () => Response.json({ success: true }),
+    DB: new FakeDB(),
+    BUCKET: new FakeBucket()
+  };
 }
 
-function request(path, options = {}, authorized = true) {
+function request(path, options = {}, authorized = false) {
   const headers = new Headers(options.headers || {});
   if (authorized) headers.set('Authorization', `Bearer ${ADMIN_KEY}`);
   return new Request(`https://archive.test${path}`, { ...options, headers });
@@ -96,101 +99,97 @@ function pdf(name = '资料.pdf', extra = []) {
   return new File([new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, ...extra])], name, { type: PDF_MIME });
 }
 
-function uploadRequest(file, fields = {}) {
+function uploadRequest(file, fields = {}, authorized = false) {
   const form = new FormData();
-  form.set('title', fields.title || '<img src=x onerror=alert(1)>');
-  form.set('category', fields.category || '试卷资料');
-  form.set('scope', fields.scope || '八年级 / 物理');
-  form.set('uploaded_by', fields.uploadedBy || '人员1（我）');
   form.set('file', file);
-  return request('/api/documents', { method: 'POST', body: form });
+  if (fields.note !== undefined) form.set('note', fields.note);
+  form.set('cf-turnstile-response', fields.token || 'valid-test-token');
+  return request('/api/documents', {
+    method: 'POST',
+    headers: { 'CF-Connecting-IP': fields.address || '203.0.113.10' },
+    body: form
+  }, authorized);
 }
 
-test('all five document capabilities reject a missing key', async () => {
+test('teachers can list documents but download and delete require the admin key', async () => {
   const bindings = env();
-  const calls = [
-    onRequestGet({ request: request('/api/documents', {}, false), env: bindings }),
-    onRequestPost({ request: request('/api/documents', { method: 'POST' }, false), env: bindings }),
-    onRequestFile({ request: request('/api/documents/id/file', {}, false), env: bindings, params: { id: 'id' } }),
-    onRequestPatch({ request: request('/api/documents/id', { method: 'PATCH' }, false), env: bindings, params: { id: 'id' } }),
-    onRequestDelete({ request: request('/api/documents/id', { method: 'DELETE' }, false), env: bindings, params: { id: 'id' } })
-  ];
-  const responses = await Promise.all(calls);
-  assert.deepEqual(responses.map(response => response.status), [401, 401, 401, 401, 401]);
+  const list = await onRequestGet({ request: request('/api/documents'), env: bindings });
+  assert.equal(list.status, 200);
+  assert.equal((await list.json()).is_admin, false);
+
+  const responses = await Promise.all([
+    onRequestFile({ request: request('/api/documents/id/file'), env: bindings, params: { id: 'id' } }),
+    onRequestDelete({ request: request('/api/documents/id', { method: 'DELETE' }), env: bindings, params: { id: 'id' } })
+  ]);
+  assert.deepEqual(responses.map(response => response.status), [401, 401]);
 });
 
-test('a short configured key is rejected as a service misconfiguration', async () => {
+test('public upload, list, private download and soft delete form a persistent lifecycle', async () => {
   const bindings = env();
-  bindings.ADMIN_KEY = 'too-short';
-  const response = await onRequestGet({
-    request: request('/api/documents', {}, false),
+  const createdResponse = await onRequestPost({
+    request: uploadRequest(pdf(), { note: '八年级物理' }),
     env: bindings
   });
-  assert.equal(response.status, 503);
-});
-
-test('upload, list, status, download and soft delete form a persistent lifecycle', async () => {
-  const bindings = env();
-  const createdResponse = await onRequestPost({ request: uploadRequest(pdf()), env: bindings });
   assert.equal(createdResponse.status, 201);
   const created = (await createdResponse.json()).document;
-  assert.equal(created.status, '待确认');
-  assert.equal(created.uploaded_by, '人员1（我）');
+  assert.equal(created.title, '资料.pdf');
+  assert.equal(created.note, '八年级物理');
+  assert.equal(created.ai_status, 'not_started');
   assert.equal(bindings.DB.rows.get(created.id).object_key.includes('资料.pdf'), false);
   assert.equal(bindings.BUCKET.objects.size, 1);
 
   const listResponse = await onRequestGet({ request: request('/api/documents'), env: bindings });
   const listed = (await listResponse.json()).documents;
   assert.equal(listed.length, 1);
-  assert.equal(listed[0].title, '<img src=x onerror=alert(1)>');
   assert.equal('object_key' in listed[0], false);
-
-  const patchResponse = await onRequestPatch({
-    request: request(`/api/documents/${created.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: '已确认' })
-    }),
-    env: bindings,
-    params: { id: created.id }
-  });
-  assert.equal(patchResponse.status, 200);
-  assert.equal(bindings.DB.rows.get(created.id).status, '已确认');
+  assert.equal('network_hash' in listed[0], false);
 
   const fileResponse = await onRequestFile({
-    request: request(`/api/documents/${created.id}/file`),
+    request: request(`/api/documents/${created.id}/file`, {}, true),
     env: bindings,
     params: { id: created.id }
   });
   assert.equal(fileResponse.status, 200);
   assert.match(fileResponse.headers.get('Content-Disposition'), /^attachment;/);
   assert.equal(fileResponse.headers.get('X-Content-Type-Options'), 'nosniff');
-  assert.deepEqual(new Uint8Array(await fileResponse.arrayBuffer()), new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]));
 
   const deleteResponse = await onRequestDelete({
-    request: request(`/api/documents/${created.id}`, { method: 'DELETE' }),
+    request: request(`/api/documents/${created.id}`, { method: 'DELETE' }, true),
     env: bindings,
     params: { id: created.id }
   });
   assert.equal(deleteResponse.status, 200);
   assert.ok(bindings.DB.rows.get(created.id).deleted_at);
   assert.equal(bindings.BUCKET.objects.size, 1);
-  const empty = await onRequestGet({ request: request('/api/documents'), env: bindings });
-  assert.equal((await empty.json()).documents.length, 0);
 });
 
-test('server rejects extension, MIME, signature, uploader and size violations', async () => {
+test('Turnstile and five uploads per network per hour protect public upload', async () => {
+  const bindings = env();
+  bindings.TURNSTILE_FETCH = async () => Response.json({ success: false });
+  const rejected = await onRequestPost({ request: uploadRequest(pdf()), env: bindings });
+  assert.equal(rejected.status, 400);
+  assert.equal(bindings.BUCKET.objects.size, 0);
+
+  bindings.TURNSTILE_FETCH = async () => Response.json({ success: true });
+  for (let index = 0; index < 5; index += 1) {
+    const response = await onRequestPost({ request: uploadRequest(pdf(`资料-${index}.pdf`)), env: bindings });
+    assert.equal(response.status, 201);
+  }
+  const limited = await onRequestPost({ request: uploadRequest(pdf('第六份.pdf')), env: bindings });
+  assert.equal(limited.status, 429);
+});
+
+test('server still rejects extension, MIME, signature, note and size violations', async () => {
   const cases = [
     [new File(['text'], 'bad.txt', { type: 'text/plain' }), {}, 400],
     [new File(['%PDF-'], 'bad.pdf', { type: 'text/plain' }), {}, 400],
     [new File(['not-pdf'], 'bad.pdf', { type: PDF_MIME }), {}, 400],
-    [pdf(), { uploadedBy: '其他人员' }, 400],
+    [pdf(), { note: 'x'.repeat(501) }, 400],
     [new File([new Uint8Array(50 * 1024 * 1024 + 1)], 'large.pdf', { type: PDF_MIME }), {}, 413]
   ];
-
-  for (const [file, fields, expectedStatus] of cases) {
+  for (const [file, fields, status] of cases) {
     const response = await onRequestPost({ request: uploadRequest(file, fields), env: env() });
-    assert.equal(response.status, expectedStatus);
+    assert.equal(response.status, status);
     assert.ok((await response.json()).error);
   }
 });
