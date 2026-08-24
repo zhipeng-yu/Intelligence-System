@@ -2,6 +2,8 @@
 
 面向“人员1（我）”和“人员2（上级）”的单校画像系统，使用原生 HTML、CSS、JavaScript 与 Cloudflare Pages Functions、私有 R2、D1 实现。现有资料库能力完整保留；资料作为证据，人工登记并确认的字段结论形成可解释画像。
 
+仓库当前实现仍是未部署的画像 1.0；下一阶段已确认简化重构为八张画像卡片和自动 AI 整理，具体方案及当前执行边界见 `school-profile-handoff.md`。
+
 临时地址：<https://ledu-school-archive.pages.dev>
 
 ## 使用方式
