@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="referrer" content="no-referrer">
-  <meta name="description" content="目标学校A两人资料库">
-  <title>学校资料库｜乐读</title>
+  <meta name="description" content="目标学校A学校画像系统">
+  <title>学校画像系统｜乐读</title>
   <style>
     :root {
       --paper: #f3f0e8;
@@ -39,13 +39,15 @@
 
     button,
     input,
-    select { font: inherit; }
+    select,
+    textarea { font: inherit; }
     button { color: inherit; }
 
     a:focus-visible,
     button:focus-visible,
     input:focus-visible,
-    select:focus-visible {
+    select:focus-visible,
+    textarea:focus-visible {
       outline: 3px solid var(--yellow);
       outline-offset: 3px;
     }
@@ -168,7 +170,6 @@
     .school-summary,
     .catalog-toolbar,
     .result-line,
-    .missing-head,
     .footer {
       display: flex;
       align-items: center;
@@ -311,6 +312,209 @@
       display: block;
       margin-top: 17px;
       font: 800 clamp(27px, 3vw, 40px)/1 var(--display);
+    }
+
+    .profile-overview {
+      display: grid;
+      grid-template-columns: minmax(250px, .75fr) minmax(0, 1.75fr);
+      gap: 12px;
+    }
+
+    .profile-score,
+    .profile-explanation,
+    .profile-editor,
+    .profile-fields-panel {
+      padding: 22px;
+      background: rgba(255, 253, 248, .88);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+
+    .profile-score { border-top: 4px solid var(--red); }
+
+    .profile-percent {
+      display: block;
+      margin-top: 15px;
+      font: 800 clamp(46px, 7vw, 74px)/1 var(--display);
+      letter-spacing: -.05em;
+    }
+
+    .progress-track {
+      height: 10px;
+      margin-top: 18px;
+      background: var(--paper-deep);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      width: 0;
+      height: 100%;
+      background: var(--red);
+      transition: width .25s ease;
+    }
+
+    .profile-score p,
+    .profile-explanation p {
+      margin: 13px 0 0;
+      color: var(--ink-soft);
+      line-height: 1.7;
+    }
+
+    .state-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .state-chip {
+      padding: 7px 9px;
+      background: var(--paper-deep);
+      font-size: 11px;
+    }
+
+    .dimension-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 9px;
+      margin-top: 16px;
+    }
+
+    .dimension-card {
+      padding: 12px;
+      border: 1px solid var(--line);
+      background: var(--white);
+    }
+
+    .dimension-card span,
+    .dimension-card small {
+      display: block;
+      color: var(--ink-soft);
+      font-size: 10px;
+    }
+
+    .dimension-card strong {
+      display: block;
+      margin: 7px 0 5px;
+      font: 700 20px/1 var(--display);
+    }
+
+    .next-list {
+      margin: 13px 0 0;
+      padding-left: 20px;
+    }
+
+    .next-list li { margin-top: 8px; line-height: 1.5; }
+    .next-list small { color: var(--ink-soft); }
+
+    .profile-editor { margin-top: 12px; border-top: 4px solid var(--ink); }
+
+    .profile-form {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1fr;
+      gap: 15px;
+      margin-top: 18px;
+    }
+
+    .profile-form .value-field { grid-column: span 2; }
+    .profile-form .form-actions { grid-column: span 1; }
+
+    .form-field textarea {
+      width: 100%;
+      min-height: 88px;
+      padding: 10px 11px;
+      color: var(--ink);
+      background: var(--white);
+      border: 1px solid var(--ink);
+      border-radius: 0;
+      resize: vertical;
+    }
+
+    .profile-fields-panel { padding: 0; }
+
+    .profile-dimension { border-bottom: 1px solid var(--line); }
+    .profile-dimension:last-child { border-bottom: 0; }
+
+    .profile-dimension h3 {
+      padding: 18px 20px 8px;
+      font-size: 17px;
+    }
+
+    .profile-field {
+      display: grid;
+      grid-template-columns: minmax(180px, .7fr) minmax(0, 1.5fr);
+      gap: 20px;
+      padding: 15px 20px;
+      border-top: 1px solid rgba(201, 195, 182, .7);
+    }
+
+    .profile-field-title {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .profile-field-title strong { font: 700 15px/1.5 var(--display); }
+
+    .field-score {
+      display: block;
+      margin-top: 7px;
+      color: var(--ink-soft);
+      font-size: 10px;
+    }
+
+    .profile-status {
+      display: inline-block;
+      flex: 0 0 auto;
+      padding: 4px 7px;
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .profile-status.confirmed { color: #1f6654; background: #deeee7; }
+    .profile-status.pending { color: #8c4e18; background: #f5e6c6; }
+    .profile-status.conflict { color: var(--red-dark); background: #f5ded9; }
+    .profile-status.expired,
+    .profile-status.missing { color: var(--ink-soft); background: var(--paper-deep); }
+
+    .field-empty {
+      margin: 0;
+      color: var(--ink-soft);
+      font-size: 11px;
+      line-height: 1.6;
+    }
+
+    .candidate {
+      padding: 11px 0;
+      border-bottom: 1px dashed var(--line);
+    }
+
+    .candidate:first-child { padding-top: 0; }
+    .candidate:last-child { padding-bottom: 0; border-bottom: 0; }
+    .candidate p { margin: 0; line-height: 1.65; white-space: pre-wrap; }
+
+    .candidate-meta {
+      display: block;
+      margin-top: 6px;
+      color: var(--ink-soft);
+      font-size: 10px;
+      line-height: 1.6;
+    }
+
+    .candidate-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin-top: 9px;
+    }
+
+    .candidate-actions select {
+      min-height: 34px;
+      padding: 0 8px;
+      color: var(--ink);
+      background: var(--white);
+      border: 1px solid var(--line);
     }
 
     .section {
@@ -552,9 +756,7 @@
       font: 10px/1.5 var(--body);
     }
 
-    .category-tag,
-    .status-tag,
-    .demo-link-mark {
+    .category-tag {
       display: inline-block;
       padding: 4px 7px;
       font-size: 10px;
@@ -562,18 +764,6 @@
     }
 
     .category-tag { color: var(--ink); background: var(--paper-deep); }
-    .status-tag.confirmed { color: #1f6654; background: #deeee7; }
-    .status-tag.pending { color: #8c4e18; background: #f5e6c6; }
-
-    .source-link {
-      color: var(--red-dark);
-      font-weight: 700;
-      text-decoration-thickness: 1px;
-      text-underline-offset: 3px;
-      white-space: nowrap;
-    }
-
-    .source-link:hover { color: var(--red); }
 
     .status-select {
       min-height: 34px;
@@ -589,13 +779,6 @@
       white-space: nowrap;
     }
 
-    .demo-link-mark {
-      margin-left: 4px;
-      color: var(--red-dark);
-      background: #f5ded9;
-      font-weight: 400;
-    }
-
     .empty-state {
       display: none;
       padding: 45px 20px;
@@ -609,54 +792,6 @@
       margin-bottom: 7px;
       color: var(--ink);
       font: 700 18px/1.3 var(--display);
-    }
-
-    .missing-board {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
-    }
-
-    .missing-item {
-      position: relative;
-      min-height: 120px;
-      padding: 19px 54px 19px 20px;
-      background: rgba(255, 253, 248, .88);
-      border: 1px solid var(--line);
-      border-left: 5px solid var(--red);
-      box-shadow: 0 9px 26px rgba(18, 42, 46, .045);
-    }
-
-    .missing-item::after {
-      content: "缺";
-      position: absolute;
-      top: 18px;
-      right: 18px;
-      width: 26px;
-      height: 26px;
-      display: grid;
-      place-items: center;
-      color: var(--red-dark);
-      border: 1px solid var(--red);
-      font: 700 13px/1 var(--display);
-      transform: rotate(4deg);
-    }
-
-    .missing-head { justify-content: flex-start; }
-
-    .missing-category {
-      color: var(--red-dark);
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: .08em;
-    }
-
-    .missing-item h3 { margin-top: 13px; }
-
-    .missing-item p {
-      margin: 7px 0 0;
-      color: var(--ink-soft);
-      font-size: 11px;
     }
 
     .footer {
@@ -684,6 +819,7 @@
       .side-note { display: none; }
       .side-nav a { min-height: 42px; padding: 12px 6px; text-align: center; }
       .side-nav a::before { content: attr(data-short); font: 700 14px/1 var(--display); }
+      .profile-overview { grid-template-columns: 1fr; }
     }
 
     @media (max-width: 760px) {
@@ -713,11 +849,14 @@
       .school-summary,
       .catalog-toolbar { flex-direction: column; }
       .upload-form { grid-template-columns: 1fr; }
+      .profile-form { grid-template-columns: 1fr; }
       .file-field { grid-column: auto; }
+      .profile-form .value-field,
+      .profile-form .form-actions { grid-column: auto; }
       .school-stamp { width: 100%; }
       .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .profile-field { grid-template-columns: 1fr; gap: 11px; }
       .filter-note { max-width: none; text-align: left; }
-      .missing-board { grid-template-columns: 1fr; }
       .footer { flex-direction: column; }
     }
 
@@ -725,6 +864,7 @@
       .topbar { display: block; }
       .demo-badge { margin-top: 17px; }
       .stats { grid-template-columns: 1fr; }
+      .dimension-grid { grid-template-columns: 1fr; }
       .section-heading { display: block; }
       .section-heading p { margin-top: 9px; }
     }
@@ -747,29 +887,30 @@
       <div class="brand">
         <div class="brand-mark">乐</div>
         <div>
-          <strong>学校资料库</strong>
-          <span>School Archive</span>
+          <strong>学校画像</strong>
+          <span>School Profile</span>
         </div>
       </div>
       <p class="side-label">资料索引</p>
       <nav class="side-nav">
         <a class="active" href="#school" data-index="01" data-short="校"><span>学校概况</span></a>
-        <a href="#upload" data-index="02" data-short="传"><span>上传资料</span></a>
-        <a href="#catalog" data-index="03" data-short="资"><span>资料清单</span></a>
-        <a href="#missing" data-index="04" data-short="缺"><span>缺失资料</span></a>
+        <a href="#profile" data-index="02" data-short="像"><span>画像进度</span></a>
+        <a href="#upload" data-index="03" data-short="传"><span>上传资料</span></a>
+        <a href="#catalog" data-index="04" data-short="资"><span>资料清单</span></a>
+        <a href="#missing" data-index="05" data-short="缺"><span>字段与缺失</span></a>
       </nav>
       <div class="side-note">
-        <span>资料库 1.0</span>
-        <p>两人共享维护，<br>资料私有保存。</p>
+        <span>画像系统 1.0</span>
+        <p>资料作为证据，<br>结论可以追溯。</p>
       </div>
-      <span class="mobile-context">目标学校A · 两人资料库</span>
+      <span class="mobile-context">目标学校A · 学校画像</span>
     </aside>
 
     <main>
       <header class="topbar">
         <div>
-          <span class="eyebrow">SCHOOL ARCHIVE · 1.0</span>
-          <h1>学校资料库</h1>
+          <span class="eyebrow">SCHOOL PROFILE · 1.0</span>
+          <h1>学校画像系统</h1>
         </div>
         <span class="demo-badge">共享密钥保护</span>
       </header>
@@ -779,25 +920,82 @@
           <div class="school-copy">
             <span class="eyebrow">目标学校 / 01</span>
             <h2 id="school-title">目标学校A</h2>
-            <p>单校资料索引 · 当前聚焦八至九年级。资料 API 由共享管理密钥保护，真实文件保存在私有对象存储中。</p>
+            <p>单校试点 · 当前学期 · 一个试点年级与学科。资料是证据，人工确认后的画像结论可以返回原始来源。</p>
           </div>
           <div class="school-stamp">
             <span>最近资料更新</span>
             <strong id="latestUpdate">—</strong>
           </div>
         </div>
-        <div class="stats" aria-label="资料统计">
+        <div class="stats" aria-label="资料与画像统计">
           <article class="stat"><span>已收集资料</span><strong id="totalCount">0</strong></article>
           <article class="stat"><span>已确认</span><strong id="confirmedCount">0</strong></article>
           <article class="stat"><span>待确认</span><strong id="pendingCount">0</strong></article>
-          <article class="stat"><span>当前缺失</span><strong>4</strong></article>
+          <article class="stat"><span>缺失画像字段</span><strong id="missingFieldCount">36</strong></article>
+        </div>
+      </section>
+
+      <section class="section" id="profile" aria-labelledby="profile-title">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">02 · SCHOOL PROFILE</span>
+            <h2 id="profile-title">画像进度</h2>
+          </div>
+          <p>按 36 个固定字段计分，不按文件数量计分</p>
+        </div>
+        <div class="profile-overview">
+          <article class="profile-score">
+            <span class="eyebrow">当前完成度</span>
+            <strong class="profile-percent" id="profilePercent">0%</strong>
+            <div class="progress-track" aria-hidden="true"><div class="progress-fill" id="profileProgress"></div></div>
+            <p id="profileWhy">尚无候选结论，36 个字段均为缺失，因此完成度为 0%。</p>
+            <div class="state-summary" id="profileStates"></div>
+          </article>
+          <article class="profile-explanation">
+            <span class="eyebrow">分维度进度</span>
+            <div class="dimension-grid" id="profileDimensions"></div>
+            <h3 style="margin-top: 20px;">下一步补什么最有效</h3>
+            <ol class="next-list" id="profileSuggestions"></ol>
+          </article>
+        </div>
+
+        <div class="profile-editor">
+          <span class="eyebrow">人工候选信息</span>
+          <h3>从一份资料登记一个候选结论</h3>
+          <p class="upload-note">新候选固定为“待确认”，只贡献字段权重的 25%；确认前必须先确认来源资料。</p>
+          <form class="profile-form" id="profileForm">
+            <div class="form-field">
+              <label for="profileFieldInput">画像字段</label>
+              <select id="profileFieldInput" name="field_key" required></select>
+            </div>
+            <div class="form-field">
+              <label for="profileDocumentInput">来源资料</label>
+              <select id="profileDocumentInput" name="document_id" required></select>
+            </div>
+            <div class="form-field">
+              <label for="profileObservedInput">信息日期</label>
+              <input id="profileObservedInput" name="observed_on" type="date" required>
+            </div>
+            <div class="form-field value-field">
+              <label for="profileValueInput">候选结论</label>
+              <textarea id="profileValueInput" name="value" maxlength="2000" placeholder="只填写这个字段的明确结论，不粘贴整份资料" required></textarea>
+            </div>
+            <div class="form-field">
+              <label for="profileLocatorInput">来源定位</label>
+              <input id="profileLocatorInput" name="source_locator" maxlength="200" placeholder="例如：第 3 页 / 教学进度工作表" required>
+            </div>
+            <div class="form-actions">
+              <button class="primary-button" id="profileButton" type="submit">登记为待确认</button>
+            </div>
+          </form>
+          <p class="notice" id="profileMessage" role="status" aria-live="polite"></p>
         </div>
       </section>
 
       <section class="section" id="upload" aria-labelledby="upload-title">
         <div class="section-heading">
           <div>
-            <span class="eyebrow">02 · DOCUMENT UPLOAD</span>
+            <span class="eyebrow">03 · DOCUMENT UPLOAD</span>
             <h2 id="upload-title">上传资料</h2>
           </div>
           <p>仅支持 PDF、DOCX、XLSX · 单文件最大 50MB</p>
@@ -846,7 +1044,7 @@
       <section class="section" id="catalog" aria-labelledby="catalog-title">
         <div class="section-heading">
           <div>
-            <span class="eyebrow">03 · DOCUMENT INDEX</span>
+            <span class="eyebrow">04 · DOCUMENT INDEX</span>
             <h2 id="catalog-title">资料清单</h2>
           </div>
           <p>输入关键词，或按五类资料快速筛选</p>
@@ -894,44 +1092,30 @@
       <section class="section" id="missing" aria-labelledby="missing-title">
         <div class="section-heading">
           <div>
-            <span class="eyebrow">04 · MISSING DOCUMENTS</span>
-            <h2 id="missing-title">缺失资料</h2>
+            <span class="eyebrow">05 · PROFILE FIELDS</span>
+            <h2 id="missing-title">画像字段与缺失</h2>
           </div>
-          <p>4 项尚未收集 · 直接可见</p>
+          <p>已知、待确认、冲突、过期和缺失统一可见</p>
         </div>
-        <div class="missing-board">
-          <article class="missing-item">
-            <div class="missing-head"><span class="missing-category">学校信息</span></div>
-            <h3>学校作息时间表</h3>
-            <p>全校 · 最新学期版本</p>
-          </article>
-          <article class="missing-item">
-            <div class="missing-head"><span class="missing-category">教学进度</span></div>
-            <h3>八年级化学期中教学进度</h3>
-            <p>八年级 / 化学 · 当前学期</p>
-          </article>
-          <article class="missing-item">
-            <div class="missing-head"><span class="missing-category">试卷资料</span></div>
-            <h3>九年级英语期末试卷答案</h3>
-            <p>九年级 / 英语 · 试卷答案缺失</p>
-          </article>
-          <article class="missing-item">
-            <div class="missing-head"><span class="missing-category">活动与产品</span></div>
-            <h3>暑期家长会产品说明</h3>
-            <p>全年级 / 全科 · 最新版本</p>
-          </article>
+        <div class="profile-fields-panel">
+          <div id="profileFields"></div>
         </div>
       </section>
 
       <footer class="footer">
-        <span>学校资料库 1.0 · 单校资料索引</span>
-        <span>两人共享管理 · 上传者为手动声明 · 2026.08.20</span>
+        <span>学校画像系统 1.0 · 单校人工确认试点</span>
+        <span>资料私有保存 · 结论来源可追溯 · 2026.08.24</span>
       </footer>
     </main>
   </div>
 
   <script>
     const CATEGORIES = ['全部', '学校信息', '教学进度', '试卷资料', '家长与情报', '活动与产品'];
+    const PROFILE_STATES = ['缺失', '待确认', '已确认', '有冲突', '已过期'];
+    const PROFILE_STATE_CLASSES = {
+      '缺失': 'missing', '待确认': 'pending', '已确认': 'confirmed',
+      '有冲突': 'conflict', '已过期': 'expired'
+    };
     const STORAGE_KEY = 'school_archive_admin_key';
     const uploadForm = document.querySelector('#uploadForm');
     const uploadButton = document.querySelector('#uploadButton');
@@ -943,6 +1127,13 @@
     const documentRows = document.querySelector('#documentRows');
     const tableWrap = document.querySelector('.table-wrap');
     const emptyState = document.querySelector('#emptyState');
+    const profileForm = document.querySelector('#profileForm');
+    const profileButton = document.querySelector('#profileButton');
+    const profileMessage = document.querySelector('#profileMessage');
+    const profileFieldInput = document.querySelector('#profileFieldInput');
+    const profileDocumentInput = document.querySelector('#profileDocumentInput');
+    const profileObservedInput = document.querySelector('#profileObservedInput');
+    const profileFields = document.querySelector('#profileFields');
     const pageUrl = new URL(window.location.href);
     const hasHashKey = pageUrl.hash.startsWith('#key=');
     const hashKey = hasHashKey
@@ -951,6 +1142,7 @@
     const hasKeyInAddress = pageUrl.searchParams.has('key') || hasHashKey;
     const urlKey = hashKey || pageUrl.searchParams.get('key');
     let documents = [];
+    let profile = null;
     let selectedCategory = '全部';
     let hasAccess = false;
     let adminKey = '';
@@ -967,6 +1159,7 @@
     }
     if (hasHashKey) pageUrl.hash = '';
     if (hasKeyInAddress) history.replaceState(null, '', `${pageUrl.pathname}${pageUrl.search}${pageUrl.hash}`);
+    profileObservedInput.value = new Date().toISOString().slice(0, 10);
 
     class ApiError extends Error {
       constructor(message, status) {
@@ -986,9 +1179,16 @@
       });
     }
 
+    function setProfileFormDisabled(disabled) {
+      profileForm.querySelectorAll('input, select, textarea, button').forEach(control => {
+        control.disabled = disabled;
+      });
+    }
+
     function setAccessState(allowed, message, type) {
       hasAccess = allowed;
       setFormDisabled(!allowed);
+      setProfileFormDisabled(!allowed || documents.length === 0);
       showMessage(accessMessage, message, type);
     }
 
@@ -1037,6 +1237,196 @@
       document.querySelector('#latestUpdate').textContent = latest ? formatDate(latest) : '—';
     }
 
+    function formatPercent(value) {
+      return `${Number.isInteger(value) ? value : value.toFixed(1)}%`;
+    }
+
+    function statusTag(status) {
+      const tag = documentNode('span');
+      tag.className = `profile-status ${PROFILE_STATE_CLASSES[status] || 'missing'}`;
+      tag.textContent = status;
+      return tag;
+    }
+
+    function renderProfileOverview() {
+      if (!profile) return;
+      document.querySelector('#profilePercent').textContent = formatPercent(profile.percentage);
+      document.querySelector('#profileProgress').style.width = `${profile.percentage}%`;
+      document.querySelector('#missingFieldCount').textContent = profile.statusCounts['缺失'] || 0;
+
+      const counts = profile.statusCounts;
+      document.querySelector('#profileWhy').textContent =
+        `固定字段权重合计 100%。已确认 ${counts['已确认']} 项按 100% 计，` +
+        `待确认 ${counts['待确认']} 项按 25% 计，冲突、过期和缺失不计分，当前贡献 ${formatPercent(profile.earned)}。`;
+
+      const stateSummary = document.querySelector('#profileStates');
+      stateSummary.replaceChildren(...PROFILE_STATES.map(state => {
+        const chip = documentNode('span');
+        chip.className = 'state-chip';
+        chip.textContent = `${state} ${counts[state] || 0}`;
+        return chip;
+      }));
+
+      const dimensions = document.querySelector('#profileDimensions');
+      dimensions.replaceChildren(...profile.dimensions.map(dimension => {
+        const card = documentNode('article');
+        card.className = 'dimension-card';
+        const label = documentNode('span');
+        label.textContent = `${dimension.label} · 权重 ${dimension.weight}%`;
+        const score = documentNode('strong');
+        score.textContent = formatPercent(dimension.percentage);
+        const detail = documentNode('small');
+        detail.textContent = `贡献 ${dimension.earned}% / ${dimension.weight}%`;
+        card.append(label, score, detail);
+        return card;
+      }));
+
+      const suggestions = document.querySelector('#profileSuggestions');
+      if (!profile.suggestions.length) {
+        const item = documentNode('li');
+        item.textContent = '全部字段均已确认且有效。';
+        suggestions.replaceChildren(item);
+      } else {
+        suggestions.replaceChildren(...profile.suggestions.map(suggestion => {
+          const item = documentNode('li');
+          const label = documentNode('strong');
+          label.textContent = suggestion.label;
+          const detail = documentNode('small');
+          detail.textContent = ` · 当前${suggestion.status}，最多可提升 ${suggestion.potential}%`;
+          item.append(label, detail);
+          return item;
+        }));
+      }
+    }
+
+    function renderProfileFormOptions() {
+      if (!profile) return;
+      const selectedField = profileFieldInput.value;
+      const selectedDocument = profileDocumentInput.value;
+      profileFieldInput.replaceChildren(...profile.dimensions.map(dimension => {
+        const group = documentNode('optgroup');
+        group.label = dimension.label;
+        profile.fields.filter(field => field.dimension === dimension.key).forEach(field => {
+          const option = documentNode('option');
+          option.value = field.key;
+          option.textContent = `${field.label}（${field.weight}%）`;
+          group.append(option);
+        });
+        return group;
+      }));
+      if (selectedField && profile.fields.some(field => field.key === selectedField)) {
+        profileFieldInput.value = selectedField;
+      }
+
+      const sourceOptions = documents.map(document => {
+        const option = documentNode('option');
+        option.value = document.id;
+        option.textContent = `${document.title}（${document.status}）`;
+        return option;
+      });
+      if (!sourceOptions.length) {
+        const option = documentNode('option');
+        option.value = '';
+        option.textContent = '请先上传一份资料';
+        sourceOptions.push(option);
+      }
+      profileDocumentInput.replaceChildren(...sourceOptions);
+      if (selectedDocument && documents.some(document => document.id === selectedDocument)) {
+        profileDocumentInput.value = selectedDocument;
+      }
+      setProfileFormDisabled(!hasAccess || documents.length === 0);
+    }
+
+    function renderCandidate(entry) {
+      const candidate = documentNode('article');
+      candidate.className = 'candidate';
+      const value = documentNode('p');
+      value.textContent = entry.value;
+      const meta = documentNode('span');
+      meta.className = 'candidate-meta';
+      const effective = entry.effective_status !== entry.status ? ` · 当前按“${entry.effective_status}”计分` : '';
+      meta.textContent = `来源：${entry.document_title} · ${entry.source_locator} · 信息日期 ${entry.observed_on} · 有效至 ${entry.expires_on}${effective}`;
+
+      const actions = documentNode('div');
+      actions.className = 'candidate-actions';
+      const status = documentNode('select');
+      status.setAttribute('aria-label', `修改“${entry.value}”的候选状态`);
+      PROFILE_STATES.slice(1).forEach(state => {
+        const option = documentNode('option');
+        option.value = state;
+        option.textContent = state;
+        status.append(option);
+      });
+      status.value = entry.status;
+      status.disabled = !hasAccess;
+      status.addEventListener('change', () => updateProfileStatus(entry, status));
+
+      const source = documentNode('button');
+      source.className = 'action-button';
+      source.type = 'button';
+      source.textContent = '下载来源';
+      source.disabled = !hasAccess;
+      source.addEventListener('click', () => {
+        const document = documents.find(item => item.id === entry.document_id);
+        if (document) downloadDocument(document, source, profileMessage);
+      });
+
+      const remove = documentNode('button');
+      remove.className = 'action-button danger';
+      remove.type = 'button';
+      remove.textContent = '删除候选';
+      remove.disabled = !hasAccess;
+      remove.addEventListener('click', () => deleteProfileCandidate(entry, remove));
+      actions.append(status, source, remove);
+      candidate.append(value, meta, actions);
+      return candidate;
+    }
+
+    function renderProfileFields() {
+      if (!profile) return;
+      const groups = profile.dimensions.map(dimension => {
+        const fields = profile.fields.filter(field => field.dimension === dimension.key);
+        const group = documentNode('section');
+        group.className = 'profile-dimension';
+        const heading = documentNode('h3');
+        heading.textContent = `${dimension.label} · ${formatPercent(dimension.percentage)}`;
+        group.append(heading, ...fields.map(field => {
+          const row = documentNode('article');
+          row.className = 'profile-field';
+          const summary = documentNode('div');
+          const title = documentNode('div');
+          title.className = 'profile-field-title';
+          const label = documentNode('strong');
+          label.textContent = field.label;
+          title.append(label, statusTag(field.status));
+          const score = documentNode('span');
+          score.className = 'field-score';
+          score.textContent = `固定权重 ${field.weight}% · 当前贡献 ${field.contribution}%`;
+          summary.append(title, score);
+
+          const content = documentNode('div');
+          if (field.entries.length) {
+            content.append(...field.entries.map(renderCandidate));
+          } else {
+            const empty = documentNode('p');
+            empty.className = 'field-empty';
+            empty.textContent = `尚无候选。可接受证据：${field.evidence}。`;
+            content.append(empty);
+          }
+          row.append(summary, content);
+          return row;
+        }));
+        return group;
+      });
+      profileFields.replaceChildren(...groups);
+    }
+
+    function renderProfile() {
+      renderProfileOverview();
+      renderProfileFormOptions();
+      renderProfileFields();
+    }
+
     function renderFilters() {
       categoryFilters.replaceChildren(...CATEGORIES.map(category => {
         const button = document.createElement('button');
@@ -1066,6 +1456,47 @@
       return item;
     }
 
+    async function refreshProfile() {
+      const response = await apiFetch('/api/profile');
+      const data = await response.json();
+      profile = data.profile;
+      renderProfile();
+    }
+
+    async function updateProfileStatus(entry, select) {
+      const previousStatus = entry.status;
+      select.disabled = true;
+      showMessage(profileMessage, '正在更新候选状态…');
+      try {
+        await apiFetch(`/api/profile/${encodeURIComponent(entry.id)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: select.value })
+        });
+        await refreshProfile();
+        showMessage(profileMessage, '候选状态已更新，完成度已重新计算。', 'success');
+      } catch (error) {
+        select.value = previousStatus;
+        showMessage(profileMessage, error.message || '候选状态更新失败。', 'error');
+      } finally {
+        select.disabled = !hasAccess;
+      }
+    }
+
+    async function deleteProfileCandidate(entry, button) {
+      if (!window.confirm(`确定删除候选结论“${entry.value}”吗？\n\n删除后画像完成度会重新计算。`)) return;
+      button.disabled = true;
+      showMessage(profileMessage, '正在删除候选信息…');
+      try {
+        await apiFetch(`/api/profile/${encodeURIComponent(entry.id)}`, { method: 'DELETE' });
+        await refreshProfile();
+        showMessage(profileMessage, '候选已删除，完成度已重新计算。', 'success');
+      } catch (error) {
+        showMessage(profileMessage, error.message || '候选删除失败。', 'error');
+        button.disabled = !hasAccess;
+      }
+    }
+
     async function updateStatus(document, select) {
       const previousStatus = document.status;
       select.disabled = true;
@@ -1077,7 +1508,8 @@
           body: JSON.stringify({ status: select.value })
         });
         document.status = select.value;
-        renderStats();
+        await refreshProfile();
+        renderAll();
         showMessage(actionMessage, '确认状态已更新。', 'success');
       } catch (error) {
         select.value = previousStatus;
@@ -1087,9 +1519,9 @@
       }
     }
 
-    async function downloadDocument(document, button) {
+    async function downloadDocument(document, button, messageElement = actionMessage) {
       button.disabled = true;
-      showMessage(actionMessage, `正在下载“${document.title}”…`);
+      showMessage(messageElement, `正在下载“${document.title}”…`);
       try {
         const response = await apiFetch(`/api/documents/${encodeURIComponent(document.id)}/file`);
         const blob = await response.blob();
@@ -1101,9 +1533,9 @@
         link.click();
         link.remove();
         setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-        showMessage(actionMessage, '下载已开始。', 'success');
+        showMessage(messageElement, '下载已开始。', 'success');
       } catch (error) {
-        showMessage(actionMessage, error.message || '下载失败。', 'error');
+        showMessage(messageElement, error.message || '下载失败。', 'error');
       } finally {
         button.disabled = !hasAccess;
       }
@@ -1117,6 +1549,7 @@
       try {
         await apiFetch(`/api/documents/${encodeURIComponent(document.id)}`, { method: 'DELETE' });
         documents = documents.filter(item => item.id !== document.id);
+        await refreshProfile();
         renderAll();
         showMessage(actionMessage, '资料已从列表删除。', 'success');
       } catch (error) {
@@ -1216,18 +1649,28 @@
       renderStats();
       renderFilters();
       renderDocuments();
+      renderProfile();
     }
 
-    async function loadDocuments() {
+    async function loadData() {
       setFormDisabled(true);
+      setProfileFormDisabled(true);
       showMessage(accessMessage, '正在连接资料库…');
       try {
-        const response = await apiFetch('/api/documents');
-        const data = await response.json();
-        documents = Array.isArray(data.documents) ? data.documents : [];
+        const [documentsResponse, profileResponse] = await Promise.all([
+          apiFetch('/api/documents'),
+          apiFetch('/api/profile')
+        ]);
+        const [documentsData, profileData] = await Promise.all([
+          documentsResponse.json(),
+          profileResponse.json()
+        ]);
+        documents = Array.isArray(documentsData.documents) ? documentsData.documents : [];
+        profile = profileData.profile;
         setAccessState(true, '管理密钥有效，已连接资料库。', 'success');
       } catch (error) {
         documents = [];
+        profile = null;
         setAccessState(false, error.message || '无法连接资料库，请刷新页面重试。', 'error');
       }
       renderAll();
@@ -1258,9 +1701,35 @@
       }
     });
 
+    profileForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!hasAccess || !documents.length) return;
+      const form = new FormData(profileForm);
+      const body = Object.fromEntries(form.entries());
+      setProfileFormDisabled(true);
+      profileButton.textContent = '正在登记…';
+      showMessage(profileMessage, '正在保存候选信息…');
+      try {
+        await apiFetch('/api/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        document.querySelector('#profileValueInput').value = '';
+        document.querySelector('#profileLocatorInput').value = '';
+        await refreshProfile();
+        showMessage(profileMessage, '候选已登记为“待确认”，完成度已重新计算。', 'success');
+      } catch (error) {
+        showMessage(profileMessage, error.message || '候选信息登记失败。', 'error');
+      } finally {
+        profileButton.textContent = '登记为待确认';
+        setProfileFormDisabled(!hasAccess || documents.length === 0);
+      }
+    });
+
     searchInput.addEventListener('input', renderDocuments);
     renderAll();
-    loadDocuments();
+    loadData();
 
     const navLinks = [...document.querySelectorAll('.side-nav a')];
     const observer = new IntersectionObserver(entries => {
