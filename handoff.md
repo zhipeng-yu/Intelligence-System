@@ -8,7 +8,7 @@
 - Pages 项目：`ledu-school-archive`
 - D1：`ledu-school-archive`（`1ba7ee18-968d-4598-aad4-8f667454563e`）
 - 私有 R2 bucket：`ledu-school-archive`
-- 生产部署：`6c46fc27-02b2-4b65-b268-2ebc1206fdad`，源码提交 `17bdc41`
+- 生产部署：`15ff5cd8-1c2b-4c5f-a33b-8ea21894c769`，源码提交 `f0234f3`
 - 远端 D1 已应用 `0002_create_profile_values.sql`
 - Pages 已部署学校画像 2.0
 - 已配置 Secret：`ADMIN_KEY`、`ARK_API_KEY`、`TURNSTILE_SECRET`、`TURNSTILE_SITE_KEY`
@@ -75,11 +75,11 @@ npx.cmd wrangler pages deploy . --project-name ledu-school-archive --branch main
 - Pages Functions 构建
 - 真实本地 D1/R2 的查看、上传、私有下载、人工编辑/解锁和软删除闭环
 - 模拟方舟响应的自动更新、锁定不覆盖、失败保留、管理员重试、输出白名单测试
-- 生产首页返回 200；公开画像 API 返回 0/8、八张卡片和已配置 Turnstile
-- 生产公开资料列表为 0；无密钥删除请求返回 401
+- 生产首页与本次部署地址均返回 200；公开画像 API 返回 1/8、八张卡片和已配置 Turnstile
+- 生产公开资料列表为 1，资料状态为 `completed`；无密钥删除请求返回 401
 - 远端 D1 无待执行迁移，新部署已成为 `main` 的最新生产部署
-- 未使用生产资料触发真实 AI 调用
+- 经用户明确授权，管理员重试一份此前失败的生产资料；Workers AI 转换、方舟 Responses API、白名单解析和 D1 写入真实链路成功
 
-Edge 本地桌面与 390px 验收已通过；发布后因当前网络对 `*.pages.dev` 连接超时，生产视觉复核未完成。该限制不影响已通过的公网 HTTP/API 检查。
+Edge 本地桌面与 390px 验收已通过；本次生产页面已在 Edge 打开并确认管理模式与失败重试入口。长耗时整理期间浏览器控制连接超时，最终 `completed` 状态和 1/8 画像结果由生产 API 复核。
 
 浏览器验收结果与当前发布边界见 `school-profile-handoff.md`。

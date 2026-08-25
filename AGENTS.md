@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-学校画像系统 2.0 已部署到 <https://ledu-school-archive.pages.dev>，远端 D1 已应用 `0002_create_profile_values.sql`。运行与发布信息以 `handoff.md` 为准。
+学校画像系统 2.0 已部署到 <https://ledu-school-archive.pages.dev>，远端 D1 已应用 `0002_create_profile_values.sql`，真实方舟整理链路已完成生产验收。运行与发布信息以 `handoff.md` 为准。
 
 ## 维护边界
 
