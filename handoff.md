@@ -8,10 +8,10 @@
 - Pages 项目：`ledu-school-archive`
 - D1：`ledu-school-archive`（`1ba7ee18-968d-4598-aad4-8f667454563e`）
 - 私有 R2 bucket：`ledu-school-archive`
-- 生产部署：`15ff5cd8-1c2b-4c5f-a33b-8ea21894c769`，源码提交 `f0234f3`
-- 远端 D1 已应用 `0002_create_profile_values.sql`
-- Pages 已部署学校画像 2.0
-- 仓库源码已实现 `0003` 对应的碎片累积、线性撤销和彻底删除，尚未执行远端迁移或新版本部署
+- 生产部署短标识：`c13e30b5`，源码提交 `8d0f94a`
+- 远端 D1 已应用到 `0003_add_linear_undo.sql`，当前无待执行迁移
+- Pages 已部署碎片累积、线性撤销和符合顺序的彻底删除
+- 生产真实 AI、单步撤销及合成资料 R2/D1 硬删除闭环已完成，生产数据恢复为原有 1 份资料且无悬空画像引用
 - 已配置 Secret：`ADMIN_KEY`、`ARK_API_KEY`、`TURNSTILE_SECRET`、`TURNSTILE_SITE_KEY`
 
 管理密钥和管理链接只保存在被 Git 忽略的本地文件或 Cloudflare Secret 中，不得写入仓库、聊天、日志、截图或普通文档。
@@ -26,7 +26,7 @@
 - 火山方舟 Responses API：`doubao-seed-2-0-lite-260215`
 - Turnstile：公开上传校验
 
-`0001_create_documents.sql` 是旧基线，不能重写；生产已应用 `0002_create_profile_values.sql`，旧文档的文件与核心元数据已迁移保留，并创建八卡片及历史表。
+`0001_create_documents.sql` 是旧基线，不能重写；生产已依次应用 `0002_create_profile_values.sql` 和 `0003_add_linear_undo.sql`。旧文档的文件与核心元数据已迁移保留，现有画像状态已补出可连续撤销的线性起点。
 
 ## 新源码权限与安全边界
 
@@ -52,13 +52,13 @@ Cloudflare 生产环境需要：
 
 发布前应在安全终端中配置或核对这些值，不得把值放进命令历史以外的可见输出。
 
-## 发布顺序
+## 后续发布顺序
 
-后续生产发布仍需逐次获得明确授权：
+下一次生产变更仍需逐次获得明确授权：
 
 1. 再次只读核对本地 `main` 与 `origin/main`。
 2. 安全核对 Secret/变量和 Workers AI binding。
-3. 如有待执行项，先应用远端 D1 迁移。
+3. 仅在迁移列表确有待执行项时应用远端 D1 迁移。
 4. 部署 Pages。
 5. 用无密钥与管理链接分别做生产冒烟验证；使用无敏感信息的小文件，避免真实学校资料触发首次 AI 验收。
 
@@ -78,9 +78,11 @@ npx.cmd wrangler pages deploy . --project-name ledu-school-archive --branch main
 - Pages Functions 构建
 - 模拟 D1/R2/方舟响应的上传、私有下载、碎片合并、同值跳过、多卡整体撤销、A/B/C 线性顺序、失败重试、撤销后禁止重试、硬删除与匿名历史测试
 - 新源码已用电脑端 Edge 验收桌面、390px 单列布局、键盘焦点、来源展开、失败重试入口、线性撤销和永久删除确认；控制台无错误，桌面截图已更新
-- 旧版生产验收时：首页与部署地址返回 200，公开画像 API 返回 1/8、八张卡片和已配置 Turnstile
-- 旧版生产验收时：公开资料列表为 1，资料状态为 `completed`，无密钥删除请求返回 401，远端 D1 当时无待执行迁移
-- 经用户明确授权，旧版生产曾重试一份此前失败的资料；Workers AI 转换、方舟 Responses API、白名单解析和 D1 写入真实链路成功
+- 2026-08-26 经用户明确授权应用远端 `0003`，复核无待执行迁移，并从干净的 `main` 部署源码提交 `8d0f94a`
+- 生产 Edge 公开/管理冒烟通过：八张卡片、完成度 1/8、原有 1 份已完成资料、公开上传和管理操作入口均符合权限边界，控制台无错误
+- 无敏感信息的合成 PDF 真实调用 Workers AI 与方舟 Responses API，完成状态成功且只生成 1 个画像撤销步骤
+- 生产线性撤销恢复到原画像 1/8；随后按顺序硬删除该合成资料，Edge 显示删除成功，D1 确认目标为 0、原有资料为 1，历史变更、历史来源和当前来源均无悬空引用
+- 当前 Wrangler OAuth 账户上下文的直接 `wrangler r2` 管理请求返回 R2 `10042`；生产 `BUCKET` binding 与应用内硬删除均正常。若以后必须直接操作 R2 CLI，应先核对 Cloudflare 账户上下文和 R2 启用状态
 
 浏览器验收结果与当前发布边界见 `school-profile-handoff.md`。
 
