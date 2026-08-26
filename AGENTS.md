@@ -2,11 +2,11 @@
 
 ## 开始前
 
-完整阅读 `readme.md`、`handoff.md`、`school-profile-handoff.md`、`new-window-prompt.md` 和相关代码；确认位于 `main`，只读核对 `origin/main` 未出现未知变化。只允许正常快进推送，禁止强推。
+完整阅读 `readme.md`、`handoff.md`、`school-profile-handoff.md` 和相关代码；确认位于 `main`，只读核对 `origin/main` 未出现未知变化。只允许正常快进推送，禁止强推。
 
 ## 当前状态
 
-学校画像系统 2.0 已部署到 <https://ledu-school-archive.pages.dev>，远端 D1 已应用 `0002_create_profile_values.sql`，真实方舟整理链路已完成生产验收。碎片累积、线性撤销和彻底删除方案已确认但尚未实现，以下边界按该目标执行；运行与发布信息以 `handoff.md` 为准。
+源码已实现碎片累积、线性撤销和符合顺序的彻底删除；生产站点仍运行旧版本，远端 D1 仅应用到 `0002_create_profile_values.sql`，`0003` 迁移与新源码均未部署。运行与发布信息以 `handoff.md` 为准。
 
 ## 维护边界
 

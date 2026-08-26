@@ -134,14 +134,17 @@
     .profile-card:nth-child(4n + 1), .profile-card:nth-child(4n + 4) { border-top-color: var(--red); }
     .card-number { color: var(--red-dark); font: 700 11px/1 var(--display); letter-spacing: .1em; }
     .profile-card h3 { margin-top: 10px; }
-    .card-content { flex: 1; margin: 14px 0; white-space: pre-wrap; }
+    .card-content { flex: 1; margin: 14px 0; padding-left: 20px; }
+    p.card-content { padding-left: 0; }
+    .card-content li + li { margin-top: 5px; }
     .card-content.empty { color: var(--ink-soft); }
     .card-meta { color: var(--ink-soft); font-size: 10px; }
     details { margin-top: 9px; }
     summary { width: fit-content; color: var(--red-dark); cursor: pointer; font-size: 11px; font-weight: 700; }
-    details p { margin: 7px 0 0; color: var(--ink-soft); font-size: 11px; }
-    .card-actions, .update-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
-    .lock-note { margin-left: 7px; color: var(--red-dark); font-size: 10px; }
+    details p, details ul { margin: 7px 0 0; color: var(--ink-soft); font-size: 11px; }
+    details ul { padding-left: 18px; }
+    .profile-actions, .update-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+    .profile-actions[hidden] { display: none; }
 
     .panel { padding: 22px; background: rgba(255, 253, 248, .9); border: 1px solid var(--line); box-shadow: var(--shadow); }
     .upload-panel { border-top: 4px solid var(--red); }
@@ -187,13 +190,8 @@
     .status.completed { color: var(--green); background: #deeee7; }
     .status.failed { color: var(--red-dark); background: #f5ded9; }
     .status.processing { color: #8c4e18; background: #f5e6c6; }
+    .status.undone { color: var(--ink-soft); }
     .empty-state { padding: 38px 18px; color: var(--ink-soft); text-align: center; background: rgba(255, 253, 248, .9); border: 1px solid var(--line); }
-
-    dialog { width: min(620px, calc(100vw - 30px)); padding: 0; color: var(--ink); background: var(--paper); border: 1px solid var(--ink); box-shadow: 0 24px 80px rgba(0, 0, 0, .25); }
-    dialog::backdrop { background: rgba(18, 42, 46, .55); }
-    .dialog-body { padding: 22px; }
-    .dialog-body textarea { min-height: 230px; margin-top: 15px; }
-    .dialog-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 15px; }
     .footer { align-items: flex-start; margin-top: 42px; padding-top: 17px; color: var(--ink-soft); border-top: 1px solid var(--line); font-size: 10px; }
 
     @media (max-width: 900px) {
@@ -260,7 +258,7 @@
           <div class="summary-copy">
             <span class="eyebrow">目标学校 / 01</span>
             <h2 id="overview-title">目标学校A</h2>
-            <p>八张卡片汇总学校当前信息。上传新资料后，系统只更新资料明确包含的内容。</p>
+            <p>八张卡片汇总学校当前信息。上传新资料后，系统会与现有画像合并，只更新资料明确包含的内容。</p>
           </div>
           <div class="completion">
             <span>画像完成度</span>
@@ -268,6 +266,9 @@
           </div>
         </div>
         <div class="profile-grid section" id="profileGrid" aria-live="polite"></div>
+        <div class="profile-actions" id="profileActions" hidden>
+          <button class="action-button danger" id="undoButton" type="button">撤销最近一次画像更新</button>
+        </div>
         <p class="notice" id="profileMessage" role="status" aria-live="polite"></p>
       </section>
 
@@ -313,23 +314,10 @@
 
       <footer class="footer">
         <span>学校画像系统 2.0 · 公司内部教学工具</span>
-        <span>私有文件 · 自动整理 · 人工内容优先</span>
+        <span>私有文件 · 自动整理 · 线性撤销</span>
       </footer>
     </main>
   </div>
-
-  <dialog id="editDialog">
-    <form class="dialog-body" id="editForm" method="dialog">
-      <span class="eyebrow">管理员编辑</span>
-      <h3 id="editTitle">编辑画像卡片</h3>
-      <label for="editContent">保存后自动锁定，后续 AI 不会覆盖</label>
-      <textarea id="editContent" maxlength="4000"></textarea>
-      <div class="dialog-actions">
-        <button class="action-button" id="cancelEdit" type="button">取消</button>
-        <button class="primary-button" type="submit">保存并锁定</button>
-      </div>
-    </form>
-  </dialog>
 
   <script>
     const STORAGE_KEY = 'school_archive_admin_key';
@@ -344,7 +332,7 @@
     let documents = [];
     let profile = null;
     let isAdmin = false;
-    let editingSection = null;
+    let canUndo = false;
     let turnstileId = null;
 
     try {
@@ -362,10 +350,10 @@
     const profileMessage = document.querySelector('#profileMessage');
     const updatesList = document.querySelector('#updatesList');
     const profileGrid = document.querySelector('#profileGrid');
+    const profileActions = document.querySelector('#profileActions');
+    const undoButton = document.querySelector('#undoButton');
     const fileDrop = document.querySelector('#fileDrop');
     const fileInput = document.querySelector('#fileInput');
-    const editDialog = document.querySelector('#editDialog');
-    const editForm = document.querySelector('#editForm');
 
     class ApiError extends Error {
       constructor(message, status) { super(message); this.status = status; }
@@ -422,23 +410,29 @@
       profileGrid.replaceChildren(...profile.sections.map((section, index) => {
         const card = node('article', '', 'profile-card');
         card.append(node('span', String(index + 1).padStart(2, '0'), 'card-number'));
-        const heading = node('h3', section.label);
-        if (isAdmin && section.locked) heading.append(node('span', '人工锁定', 'lock-note'));
-        card.append(heading);
-        card.append(node('p', section.content || '暂无内容，上传相关资料后会自动补充。', `card-content${section.content ? '' : ' empty'}`));
+        card.append(node('h3', section.label));
+        if (section.content) {
+          const items = node('ul', '', 'card-content');
+          items.append(...section.content.split('\n').filter(Boolean).map(item => node('li', item)));
+          card.append(items);
+        } else {
+          card.append(node('p', '暂无内容，上传相关资料后会自动补充。', 'card-content empty'));
+        }
         card.append(node('span', `更新：${formatDate(section.updated_at)}`, 'card-meta'));
         const source = node('details');
         source.append(node('summary', '查看来源'));
-        source.append(node('p', section.source_original_name || (section.content ? '管理员手动维护' : '暂无来源')));
-        card.append(source);
-        if (isAdmin) {
-          const actions = node('div', '', 'card-actions');
-          actions.append(actionButton('编辑', () => openEditor(section)));
-          if (section.locked) actions.append(actionButton('解除锁定', button => unlockSection(section, button)));
-          card.append(actions);
+        if (section.sources.length) {
+          const list = node('ul');
+          list.append(...section.sources.map(item => node('li', item.original_name)));
+          source.append(list);
+        } else {
+          source.append(node('p', '暂无来源'));
         }
+        card.append(source);
         return card;
       }));
+      profileActions.hidden = !(isAdmin && canUndo);
+      undoButton.disabled = !canUndo;
     }
 
     function renderDocuments() {
@@ -454,39 +448,18 @@
         if (item.category) details.push(item.category);
         if (item.scope) details.push(item.scope);
         copy.append(node('span', details.join(' · '), 'update-meta'));
-        copy.append(node('span', item.ai_error || STATUS_LABELS[item.ai_status] || '未知状态', `status ${item.ai_status}`));
+        const status = item.undone_at ? 'undone' : item.ai_status;
+        copy.append(node('span', item.undone_at ? '更新已撤销' : item.ai_error || STATUS_LABELS[item.ai_status] || '未知状态', `status ${status}`));
         row.append(copy);
         if (isAdmin) {
           const actions = node('div', '', 'update-actions');
           actions.append(actionButton('下载', button => downloadDocument(item, button)));
-          if (item.ai_status === 'failed') actions.append(actionButton('重新整理', button => analyzeDocument(item, button)));
+          if (item.ai_status === 'failed' && !item.undone_at) actions.append(actionButton('重新整理', button => analyzeDocument(item, button)));
           actions.append(actionButton('删除', button => deleteDocument(item, button), true));
           row.append(actions);
         }
         return row;
       }));
-    }
-
-    function openEditor(section) {
-      editingSection = section;
-      document.querySelector('#editTitle').textContent = `编辑：${section.label}`;
-      document.querySelector('#editContent').value = section.content;
-      editDialog.showModal();
-      document.querySelector('#editContent').focus();
-    }
-
-    async function unlockSection(section, button) {
-      button.disabled = true;
-      try {
-        await apiFetch(`/api/profile/${encodeURIComponent(section.key)}`, {
-          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ unlock: true })
-        });
-        await refreshData();
-        showMessage(profileMessage, '已解除人工锁定，后续资料可以更新这张卡片。', 'success');
-      } catch (error) {
-        showMessage(profileMessage, error.message || '解除锁定失败。', 'error');
-        button.disabled = false;
-      }
     }
 
     async function downloadDocument(item, button) {
@@ -509,15 +482,28 @@
     }
 
     async function deleteDocument(item, button) {
-      if (!window.confirm(`确定删除“${item.original_name}”吗？\n\n资料会从列表移除，私有文件仍保留以避免意外丢失。`)) return;
+      if (!window.confirm(`确定永久删除“${item.original_name}”吗？\n\n原文件和资料记录都会永久删除，无法恢复。`)) return;
       button.disabled = true;
       try {
         await apiFetch(`/api/documents/${encodeURIComponent(item.id)}`, { method: 'DELETE' });
         await refreshData();
-        showMessage(actionMessage, '资料已从列表删除。', 'success');
+        showMessage(actionMessage, '原文件和资料记录已永久删除。', 'success');
       } catch (error) {
         showMessage(actionMessage, error.message || '删除失败。', 'error');
         button.disabled = false;
+      }
+    }
+
+    async function undoLatest() {
+      undoButton.disabled = true;
+      showMessage(profileMessage, '正在撤销最近一次画像更新…');
+      try {
+        await apiFetch('/api/profile/undo', { method: 'POST' });
+        await refreshData();
+        showMessage(profileMessage, '最近一次画像更新已撤销。', 'success');
+      } catch (error) {
+        showMessage(profileMessage, error.message || '撤销失败。', 'error');
+        undoButton.disabled = false;
       }
     }
 
@@ -546,6 +532,7 @@
       profile = profileData.profile;
       documents = Array.isArray(documentsData.documents) ? documentsData.documents : [];
       isAdmin = Boolean(profileData.is_admin && documentsData.is_admin);
+      canUndo = Boolean(profileData.can_undo);
       document.querySelector('#modeBadge').textContent = isAdmin ? '管理模式' : '老师查看';
       renderProfile();
       renderDocuments();
@@ -597,20 +584,7 @@
       }
     });
 
-    editForm.addEventListener('submit', async event => {
-      event.preventDefault();
-      if (!editingSection) return;
-      const content = document.querySelector('#editContent').value;
-      try {
-        await apiFetch(`/api/profile/${encodeURIComponent(editingSection.key)}`, {
-          method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content })
-        });
-        editDialog.close();
-        await refreshData();
-        showMessage(profileMessage, '画像卡片已保存并锁定。', 'success');
-      } catch (error) { showMessage(profileMessage, error.message || '画像保存失败。', 'error'); }
-    });
-    document.querySelector('#cancelEdit').addEventListener('click', () => editDialog.close());
+    undoButton.addEventListener('click', undoLatest);
 
     ['dragenter', 'dragover'].forEach(type => fileDrop.addEventListener(type, event => {
       event.preventDefault();

@@ -9,7 +9,7 @@ import {
 
 const columns = `
   id, title, note, category, scope, ai_status, ai_error, analyzed_at,
-  uploaded_at, original_name, mime_type, size_bytes
+  uploaded_at, original_name, mime_type, size_bytes, undone_at
 `;
 
 export const onRequestGet = withPublic(async ({ request, env }) => {
@@ -92,6 +92,7 @@ export const onRequestPost = withPublic(async ({ request, env }) => {
     ai_status: 'not_started',
     ai_error: null,
     analyzed_at: null,
+    undone_at: null,
     uploaded_at: uploadedAt,
     original_name: originalName,
     mime_type: mimeType,

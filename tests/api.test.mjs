@@ -11,6 +11,8 @@ const PDF_MIME = 'application/pdf';
 class FakeDB {
   constructor() {
     this.rows = new Map();
+    this.history = [];
+    this.sections = [];
     this.failInsert = false;
   }
 
@@ -34,6 +36,15 @@ class FakeDB {
         }
         const row = database.rows.get(this.values[0]);
         if (!row || row.deleted_at) return null;
+        if (/AS has_changes/.test(sql)) {
+          return {
+            id: row.id,
+            object_key: row.object_key,
+            undone_at: row.undone_at,
+            has_changes: database.history.some(history => history.change_document_id === row.id) ? 1 : 0,
+            is_current_source: database.sections.some(section => section.source_document_id === row.id) ? 1 : 0
+          };
+        }
         return {
           original_name: row.original_name,
           object_key: row.object_key,
@@ -49,20 +60,34 @@ class FakeDB {
             id, title, note, category: null, scope: null, ai_status: 'not_started', ai_error: null,
             analyzed_at: null, auto_analyzed: 0, network_hash: networkHash, uploaded_at: uploadedAt,
             original_name: originalName, object_key: objectKey, mime_type: mimeType,
-            size_bytes: sizeBytes, deleted_at: null
+            size_bytes: sizeBytes, deleted_at: null, undone_at: null
           });
           return { meta: { changes: 1 } };
         }
-        if (/SET deleted_at/.test(sql)) {
-          const [deletedAt, id] = this.values;
-          const row = database.rows.get(id);
-          if (!row || row.deleted_at) return { meta: { changes: 0 } };
-          row.deleted_at = deletedAt;
+        if (/UPDATE profile_history/.test(sql) && /source_document_id = NULL/.test(sql)) {
+          for (const history of database.history) {
+            if (history.source_document_id === this.values[0]) history.source_document_id = null;
+          }
           return { meta: { changes: 1 } };
+        }
+        if (/UPDATE profile_history/.test(sql) && /change_document_id = NULL/.test(sql)) {
+          for (const history of database.history) {
+            if (history.change_document_id === this.values[0]) history.change_document_id = null;
+          }
+          return { meta: { changes: 1 } };
+        }
+        if (/DELETE FROM documents/.test(sql)) {
+          return { meta: { changes: database.rows.delete(this.values[0]) ? 1 : 0 } };
         }
         return { meta: { changes: 0 } };
       }
     };
+  }
+
+  async batch(statements) {
+    const results = [];
+    for (const statement of statements) results.push(await statement.run());
+    return results;
   }
 }
 
@@ -124,7 +149,7 @@ test('teachers can list documents but download and delete require the admin key'
   assert.deepEqual(responses.map(response => response.status), [401, 401]);
 });
 
-test('public upload, list, private download and soft delete form a persistent lifecycle', async () => {
+test('public upload, list, private download and permanent delete form a persistent lifecycle', async () => {
   const bindings = env();
   const createdResponse = await onRequestPost({
     request: uploadRequest(pdf(), { note: '八年级物理' }),
@@ -159,8 +184,40 @@ test('public upload, list, private download and soft delete form a persistent li
     params: { id: created.id }
   });
   assert.equal(deleteResponse.status, 200);
-  assert.ok(bindings.DB.rows.get(created.id).deleted_at);
+  assert.equal(bindings.DB.rows.has(created.id), false);
+  assert.equal(bindings.BUCKET.objects.size, 0);
+});
+
+test('an effective profile document must be undone before permanent delete', async () => {
+  const bindings = env();
+  const createdResponse = await onRequestPost({ request: uploadRequest(pdf()), env: bindings });
+  const created = (await createdResponse.json()).document;
+  bindings.DB.history.push({
+    content: '保留的匿名画像版本',
+    change_document_id: created.id,
+    source_document_id: created.id
+  });
+
+  const blocked = await onRequestDelete({
+    request: request(`/api/documents/${created.id}`, { method: 'DELETE' }, true),
+    env: bindings,
+    params: { id: created.id }
+  });
+  assert.equal(blocked.status, 409);
+  assert.equal(bindings.DB.rows.has(created.id), true);
   assert.equal(bindings.BUCKET.objects.size, 1);
+
+  bindings.DB.rows.get(created.id).undone_at = new Date().toISOString();
+  const deleted = await onRequestDelete({
+    request: request(`/api/documents/${created.id}`, { method: 'DELETE' }, true),
+    env: bindings,
+    params: { id: created.id }
+  });
+  assert.equal(deleted.status, 200);
+  assert.equal(bindings.DB.rows.has(created.id), false);
+  assert.equal(bindings.DB.history[0].content, '保留的匿名画像版本');
+  assert.equal(bindings.DB.history[0].change_document_id, null);
+  assert.equal(bindings.DB.history[0].source_document_id, null);
 });
 
 test('Turnstile and five uploads per network per hour protect public upload', async () => {
