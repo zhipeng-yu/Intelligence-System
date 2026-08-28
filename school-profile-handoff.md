@@ -6,7 +6,7 @@
 
 仓库源码已按 ponytail full 完成碎片累积与线性撤销的最小实现：复用 `profile_sections`、`profile_history` 和 `documents`，没有新增完整快照表、独立来源表、框架、依赖、队列、重做、分支或任意版本恢复。
 
-生产已应用 `0003_add_linear_undo.sql` 并部署源码提交 `b370af8`，当前页面与 API 均运行碎片累积、线性撤销和符合顺序的彻底删除。
+生产已应用 `0003_add_linear_undo.sql` 并部署源码提交 `ec9a231`，当前页面与 API 均运行碎片累积、线性撤销、符合顺序的彻底删除和最小权限机器上传。
 
 ## 页面与权限
 
@@ -63,7 +63,8 @@
 - Pages Functions 构建成功。
 - 模拟 D1/R2/方舟闭环覆盖当前画像输入、新资料合并、同值跳过、多卡整体撤销、A/B/C 顺序、失败重试、撤销后禁止重试、硬删除、匿名历史和鉴权。
 - 新页面已用电脑端 Edge 验收桌面、390px 单列布局、键盘焦点、来源展开、失败重试入口、线性撤销和永久删除确认；控制台无错误，`artifacts/school-archive-desktop.png` 已更新。
-- 生产 D1 已应用到 `0003` 且无待执行迁移；Pages 已从干净的 `main` 部署源码提交 `b370af8`，部署短标识为 `c920caef`，生产按钮文案已由 Edge 验证为“撤销”。
+- 生产 D1 已应用到 `0003` 且无待执行迁移；Pages 已从干净的 `main` 部署源码提交 `ec9a231`，部署短标识为 `a1076bd2`，本次未执行 D1 迁移。
+- 生产公开画像返回 200 和八张卡片；无文件、无密钥上传被 Turnstile 以 400 拒绝，未上传且未调用 AI。七日 Windows 任务为 Ready，运行日期为 2026-08-29 至 2026-09-04。
 - 生产 Edge 公开/管理冒烟通过：公开画像为 1/8、包含八张卡片和原有 1 份已完成资料；公开上传、Turnstile 与管理入口符合权限边界，控制台无错误。
 - 经用户明确授权，无敏感信息的合成 PDF 完成真实 Workers AI 转换、方舟 Responses API、白名单解析和 D1 写入，只生成 1 个画像撤销步骤。
 - 生产线性撤销恢复到原画像 1/8，合成资料状态变为“更新已撤销”；随后应用内硬删除成功，R2 对象和 D1 文件身份消失，原有资料保持 1 份，三类画像引用均无悬空记录。
@@ -72,6 +73,6 @@
 
 ## 发布边界
 
-生产已将 `ARK_API_KEY`、`TURNSTILE_SECRET`、`ADMIN_KEY` 和 `TURNSTILE_SITE_KEY` 配置为 Cloudflare Secret；`AI` 是 Workers AI binding。`INGEST_KEY` 和试运行计划的实际启用状态见 `handoff.md`。
+生产已将 `ARK_API_KEY`、`TURNSTILE_SECRET`、`ADMIN_KEY`、`INGEST_KEY` 和 `TURNSTILE_SITE_KEY` 配置为 Cloudflare Secret；`AI` 是 Workers AI binding。试运行实时状态见 `handoff.md`。
 
-代码提交和快进推送不授权远端 D1 `0003`、Pages 部署、生产硬删除或真实生产 AI 调用；这些动作需逐次获得明确授权。禁止强推，远端出现未知变化立即停止。
+本次已授权并完成 Pages 部署，试运行七日内最多 7 次真实生产 AI 由本地配额控制；远端 D1 迁移、生产硬删除、超额 AI 和其他生产动作仍需明确授权。禁止强推，远端出现未知变化立即停止。

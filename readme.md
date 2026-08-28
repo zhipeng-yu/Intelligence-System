@@ -4,13 +4,13 @@
 
 生产地址：<https://ledu-school-archive.pages.dev>
 
-生产环境已于 2026-08-26 应用 `0003_add_linear_undo.sql`，并于 2026-08-28 部署源码提交 `b370af8`，当前运行碎片累积、线性撤销和符合顺序的彻底删除。生产已用无敏感信息的合成资料完成真实 Workers AI、方舟 Responses API、单步撤销及 R2/D1 硬删除闭环验收。
+生产环境已于 2026-08-26 应用 `0003_add_linear_undo.sql`，并于 2026-08-28 部署源码提交 `ec9a231`，当前运行碎片累积、线性撤销、符合顺序的彻底删除和最小权限机器上传。生产已用无敏感信息的合成资料完成真实 Workers AI、方舟 Responses API、单步撤销及 R2/D1 硬删除闭环验收。
 
 ## 小红书课程产品 7 天试运行
 
 仓库包含一个本地试运行器 `automation/xhs_course_trial.py`：它复用锁定提交的 `xiaohongshu-skill`，但只启动本机系统 Edge，不下载 Chromium，不注入 stealth、指纹伪装或验证码绕过。它只监控固定公开主页 ID `565aa55cb8ce1a32c6fdebe7`，不持久化 `xsec_token`、分享参数、全文、图片、视频、评论或用户信息。
 
-首次系统 Edge 登录、账号身份核验和最新 20 条 ID 基线已完成；该步骤没有上传文件或调用 AI。运行状态、Edge profile、Conda 环境和 Windows DPAPI 加密凭据位于 `%LOCALAPPDATA%\LeduSchoolArchive\xhs-course-trial`，不进入 Git。生产启用和计划日期见 `handoff.md`。
+首次系统 Edge 登录、账号身份核验和最新 20 条 ID 基线已完成；该步骤没有上传文件或调用 AI。生产 `INGEST_KEY` 和 Pages 已启用，任务计划于 2026-08-29 至 2026-09-04 每日 09:00 运行。运行状态、Edge profile、Conda 环境和 Windows DPAPI 加密凭据位于 `%LOCALAPPDATA%\LeduSchoolArchive\xhs-course-trial`，不进入 Git；实时状态见 `handoff.md`。
 
 ## 产品边界
 

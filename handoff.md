@@ -8,13 +8,13 @@
 - Pages 项目：`ledu-school-archive`
 - D1：`ledu-school-archive`（`1ba7ee18-968d-4598-aad4-8f667454563e`）
 - 私有 R2 bucket：`ledu-school-archive`
-- 生产部署短标识：`c920caef`，源码提交 `b370af8`
+- 生产部署短标识：`a1076bd2`，源码提交 `ec9a231`
 - 远端 D1 已应用到 `0003_add_linear_undo.sql`，当前无待执行迁移
 - Pages 已部署碎片累积、线性撤销和符合顺序的彻底删除
 - 生产真实 AI、单步撤销及合成资料 R2/D1 硬删除闭环已完成，生产数据恢复为原有 1 份资料且无悬空画像引用
-- 已配置 Secret：`ADMIN_KEY`、`ARK_API_KEY`、`TURNSTILE_SECRET`、`TURNSTILE_SITE_KEY`
+- 已配置 Secret：`ADMIN_KEY`、`INGEST_KEY`、`ARK_API_KEY`、`TURNSTILE_SECRET`、`TURNSTILE_SITE_KEY`
 - 本地已完成小红书固定公开账号的系统 Edge 登录、身份核验和 20 条 ID 基线；未上传、未调用 AI
-- `INGEST_KEY`、新 Pages 源码和 7 天 Windows 任务计划程序尚待本次发布流程配置
+- Windows 任务 `Ledu-Xiaohongshu-Course-Trial` 为 Ready：2026-08-29 至 2026-09-04 每日 09:00，错过则开机补跑，2026-09-05 00:00 截止；当前 0 次 AI、无待处理条目和活动批次
 
 管理密钥和管理链接只保存在被 Git 忽略的本地文件或 Cloudflare Secret 中，不得写入仓库、聊天、日志、截图或普通文档。
 
@@ -83,6 +83,8 @@ npx.cmd wrangler pages deploy . --project-name ledu-school-archive --branch main
 - Pages Functions 构建
 - 小红书运行器锁定已安装技能的关键源码摘要，仅调用系统 Edge；未安装 Playwright Chromium，Edge 适配不注入 stealth、指纹、User-Agent 或验证码绕过脚本
 - 固定账号身份核验和最新 20 条 ID 基线通过；本地状态确认未上传、未调用 AI，且未保存分享查询参数
+- 生产源码提交 `ec9a231` 已部署为 `a1076bd2`；未执行 D1 迁移。公开画像返回 200 和八张卡片，无文件、无密钥上传被 Turnstile 以 400 拒绝，未上传且未调用 AI
+- 任务计划核对为 Ready，`StartWhenAvailable=True`、`MultipleInstances=IgnoreNew`、单次上限 1 小时，七日时间边界正确
 - 模拟 D1/R2/方舟响应的上传、私有下载、碎片合并、同值跳过、多卡整体撤销、A/B/C 线性顺序、失败重试、撤销后禁止重试、硬删除与匿名历史测试
 - 新源码已用电脑端 Edge 验收桌面、390px 单列布局、键盘焦点、来源展开、失败重试入口、线性撤销和永久删除确认；控制台无错误，桌面截图已更新
 - 2026-08-26 经用户明确授权应用远端 `0003`，复核无待执行迁移；2026-08-28 从干净的 `main` 部署源码提交 `b370af8`，并由 Edge 确认生产按钮文案为“撤销”
@@ -95,5 +97,5 @@ npx.cmd wrangler pages deploy . --project-name ledu-school-archive --branch main
 
 ## 发布边界
 
-- 代码提交和快进推送不授权远端 D1 `0003`、Pages 部署、生产硬删除或真实生产 AI 调用。
-- 上述生产动作均须再次获得明确授权。
+- 本次小红书试运行已获授权并完成 `INGEST_KEY` 配置、Pages 部署和七日任务计划；七日内最多 7 次真实生产 AI 调用仍由任务配额控制。
+- 未授权远端 D1 迁移、生产硬删除、超出试运行的生产 AI 调用或规避平台验证；其他生产动作仍须明确授权。
