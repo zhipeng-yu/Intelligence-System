@@ -6,6 +6,7 @@ import { onRequestDelete } from '../functions/api/documents/[id].js';
 import { onRequestGet as onRequestFile } from '../functions/api/documents/[id]/file.js';
 
 const ADMIN_KEY = '0123456789abcdef0123456789abcdef';
+const INGEST_KEY = 'fedcba9876543210fedcba9876543210';
 const PDF_MIME = 'application/pdf';
 
 class FakeDB {
@@ -107,6 +108,7 @@ class FakeBucket {
 function env() {
   return {
     ADMIN_KEY,
+    INGEST_KEY,
     TURNSTILE_SECRET: 'test-secret',
     TURNSTILE_FETCH: async () => Response.json({ success: true }),
     DB: new FakeDB(),
@@ -128,10 +130,12 @@ function uploadRequest(file, fields = {}, authorized = false) {
   const form = new FormData();
   form.set('file', file);
   if (fields.note !== undefined) form.set('note', fields.note);
-  form.set('cf-turnstile-response', fields.token || 'valid-test-token');
+  if (!fields.omitToken) form.set('cf-turnstile-response', fields.token || 'valid-test-token');
+  const headers = { 'CF-Connecting-IP': fields.address || '203.0.113.10' };
+  if (fields.ingestKey !== undefined) headers['X-Ingest-Key'] = fields.ingestKey;
   return request('/api/documents', {
     method: 'POST',
-    headers: { 'CF-Connecting-IP': fields.address || '203.0.113.10' },
+    headers,
     body: form
   }, authorized);
 }
@@ -147,6 +151,21 @@ test('teachers can list documents but download and delete require the admin key'
     onRequestDelete({ request: request('/api/documents/id', { method: 'DELETE' }), env: bindings, params: { id: 'id' } })
   ]);
   assert.deepEqual(responses.map(response => response.status), [401, 401]);
+
+  const ingestHeaders = { 'X-Ingest-Key': INGEST_KEY };
+  const ingestResponses = await Promise.all([
+    onRequestFile({
+      request: request('/api/documents/id/file', { headers: ingestHeaders }),
+      env: bindings,
+      params: { id: 'id' }
+    }),
+    onRequestDelete({
+      request: request('/api/documents/id', { method: 'DELETE', headers: ingestHeaders }),
+      env: bindings,
+      params: { id: 'id' }
+    })
+  ]);
+  assert.deepEqual(ingestResponses.map(response => response.status), [401, 401]);
 });
 
 test('public upload, list, private download and permanent delete form a persistent lifecycle', async () => {
@@ -234,6 +253,36 @@ test('Turnstile and five uploads per network per hour protect public upload', as
   }
   const limited = await onRequestPost({ request: uploadRequest(pdf('第六份.pdf')), env: bindings });
   assert.equal(limited.status, 429);
+});
+
+test('INGEST_KEY only bypasses Turnstile while public upload still requires it', async () => {
+  const bindings = env();
+  let turnstileCalls = 0;
+  bindings.TURNSTILE_FETCH = async () => {
+    turnstileCalls += 1;
+    return Response.json({ success: false });
+  };
+
+  const accepted = await onRequestPost({
+    request: uploadRequest(pdf('machine.pdf'), { ingestKey: INGEST_KEY, omitToken: true }),
+    env: bindings
+  });
+  assert.equal(accepted.status, 201);
+  assert.equal(turnstileCalls, 0);
+
+  const wrongKey = await onRequestPost({
+    request: uploadRequest(pdf('wrong.pdf'), { ingestKey: 'wrong-key', omitToken: true }),
+    env: bindings
+  });
+  assert.equal(wrongKey.status, 400);
+  assert.equal(turnstileCalls, 0);
+
+  const publicUpload = await onRequestPost({
+    request: uploadRequest(pdf('public.pdf')),
+    env: bindings
+  });
+  assert.equal(publicUpload.status, 400);
+  assert.equal(turnstileCalls, 1);
 });
 
 test('server still rejects extension, MIME, signature, note and size violations', async () => {

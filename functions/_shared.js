@@ -61,6 +61,11 @@ export async function isAdmin(request, env) {
   return sameSecret(authorization, `Bearer ${env.ADMIN_KEY}`);
 }
 
+export async function isIngest(request, env) {
+  if (typeof env.INGEST_KEY !== 'string' || encoder.encode(env.INGEST_KEY).byteLength < 32) return false;
+  return sameSecret(request.headers.get('X-Ingest-Key') || '', env.INGEST_KEY);
+}
+
 function storageError(env) {
   return !env.DB || !env.BUCKET ? json({ error: '服务存储尚未配置完成。' }, 503) : null;
 }

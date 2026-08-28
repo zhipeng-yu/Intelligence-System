@@ -20,6 +20,8 @@
 
 公开访问可查看卡片、当前有效的卡片级参考资料和上传。管理链接显示原文件下载、失败重试、全局“撤销”按钮和符合撤销顺序的彻底删除；人工编辑、解锁、锁定提示和画像 PATCH API 已删除。
 
+小红书试运行的机器上传只在现有 `POST /api/documents` 接受独立 `X-Ingest-Key`。正确密钥仅绕过 Turnstile，网络散列限流、PDF/DOCX/XLSX、50MB、扩展名、MIME 和文件头校验均保持；该密钥不能访问任何管理接口。
+
 ## AI 闭环
 
 ```text
@@ -53,8 +55,9 @@
 
 ## 已验证
 
-- API 测试：6 项通过。
+- API 测试：7 项通过，包含正确/错误 `INGEST_KEY` 和公开 Turnstile 不回退。
 - 画像/AI/撤销测试：7 项通过。
+- 小红书试运行 Python 测试：6 项通过；固定账号的系统 Edge 登录、身份核验和 20 条 ID 基线已完成，未上传且未调用 AI。
 - 全新本地迁移：`0001`、`0002`、`0003` 均成功。
 - 已有状态回填：本地 `A → B` 夹具正确生成两个线性撤销起点和前一更新时间。
 - Pages Functions 构建成功。
@@ -69,6 +72,6 @@
 
 ## 发布边界
 
-生产已将 `ARK_API_KEY`、`TURNSTILE_SECRET`、`ADMIN_KEY` 和 `TURNSTILE_SITE_KEY` 配置为 Cloudflare Secret；`AI` 是 Workers AI binding。具体资源和后续发布顺序见 `handoff.md`。
+生产已将 `ARK_API_KEY`、`TURNSTILE_SECRET`、`ADMIN_KEY` 和 `TURNSTILE_SITE_KEY` 配置为 Cloudflare Secret；`AI` 是 Workers AI binding。`INGEST_KEY` 和试运行计划的实际启用状态见 `handoff.md`。
 
 代码提交和快进推送不授权远端 D1 `0003`、Pages 部署、生产硬删除或真实生产 AI 调用；这些动作需逐次获得明确授权。禁止强推，远端出现未知变化立即停止。

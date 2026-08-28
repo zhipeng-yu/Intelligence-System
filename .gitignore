@@ -1,2 +1,4 @@
 .dev.vars*
 .wrangler/
+__pycache__/
+*.pyc

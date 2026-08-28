@@ -1,5 +1,6 @@
 import {
   isAdmin,
+  isIngest,
   json,
   networkHash,
   readUpload,
@@ -31,17 +32,20 @@ export const onRequestPost = withPublic(async ({ request, env }) => {
   }
 
   const admin = await isAdmin(request, env);
+  const ingest = await isIngest(request, env);
   let addressHash = null;
   if (!admin) {
     const address = request.headers.get('CF-Connecting-IP') || '';
     if (!address) return json({ error: '无法验证上传来源，请稍后重试。' }, 400);
-    if (typeof env.TURNSTILE_SECRET !== 'string' || !env.TURNSTILE_SECRET) {
-      return json({ error: '上传验证尚未配置完成。' }, 503);
-    }
-    const token = form.get('cf-turnstile-response');
-    const fetcher = typeof env.TURNSTILE_FETCH === 'function' ? env.TURNSTILE_FETCH : fetch;
-    if (typeof token !== 'string' || !await validateTurnstile(token, address, env.TURNSTILE_SECRET, fetcher)) {
-      return json({ error: '人机验证失败或已过期，请重试。' }, 400);
+    if (!ingest) {
+      if (typeof env.TURNSTILE_SECRET !== 'string' || !env.TURNSTILE_SECRET) {
+        return json({ error: '上传验证尚未配置完成。' }, 503);
+      }
+      const token = form.get('cf-turnstile-response');
+      const fetcher = typeof env.TURNSTILE_FETCH === 'function' ? env.TURNSTILE_FETCH : fetch;
+      if (typeof token !== 'string' || !await validateTurnstile(token, address, env.TURNSTILE_SECRET, fetcher)) {
+        return json({ error: '人机验证失败或已过期，请重试。' }, 400);
+      }
     }
     addressHash = await networkHash(address, env.ADMIN_KEY);
     if (!addressHash) return json({ error: '上传限流尚未配置完成。' }, 503);

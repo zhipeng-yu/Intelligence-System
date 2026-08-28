@@ -6,6 +6,12 @@
 
 生产环境已于 2026-08-26 应用 `0003_add_linear_undo.sql`，并于 2026-08-28 部署源码提交 `b370af8`，当前运行碎片累积、线性撤销和符合顺序的彻底删除。生产已用无敏感信息的合成资料完成真实 Workers AI、方舟 Responses API、单步撤销及 R2/D1 硬删除闭环验收。
 
+## 小红书课程产品 7 天试运行
+
+仓库包含一个本地试运行器 `automation/xhs_course_trial.py`：它复用锁定提交的 `xiaohongshu-skill`，但只启动本机系统 Edge，不下载 Chromium，不注入 stealth、指纹伪装或验证码绕过。它只监控固定公开主页 ID `565aa55cb8ce1a32c6fdebe7`，不持久化 `xsec_token`、分享参数、全文、图片、视频、评论或用户信息。
+
+首次系统 Edge 登录、账号身份核验和最新 20 条 ID 基线已完成；该步骤没有上传文件或调用 AI。运行状态、Edge profile、Conda 环境和 Windows DPAPI 加密凭据位于 `%LOCALAPPDATA%\LeduSchoolArchive\xhs-course-trial`，不进入 Git。生产启用和计划日期见 `handoff.md`。
+
 ## 产品边界
 
 - 首页只有学校信息概览、极简上传、最近更新三个区域。
@@ -37,11 +43,12 @@ AI 为受影响卡片返回完整新版短条目：保留不冲突旧项，以�
 npx.cmd wrangler d1 migrations apply ledu-school-archive --local --persist-to .wrangler/state
 node --test tests/api.test.mjs
 node --test tests/profile.test.mjs
+%LOCALAPPDATA%\LeduSchoolArchive\xhs-course-trial\conda-env\python.exe -m unittest tests/test_xhs_course_trial.py
 npx.cmd wrangler pages functions build
 npx.cmd wrangler pages dev . --persist-to .wrangler/state
 ```
 
-本地运行需要在被 Git 忽略的环境中提供 `ADMIN_KEY`、`ARK_API_KEY`、`TURNSTILE_SECRET` 和公开的 `TURNSTILE_SITE_KEY`；Workers AI 通过 `wrangler.toml` 的 `AI` binding 提供。测试使用模拟响应，不会调用真实方舟。
+本地运行需要在被 Git 忽略的环境中提供 `ADMIN_KEY`、`INGEST_KEY`、`ARK_API_KEY`、`TURNSTILE_SECRET` 和公开的 `TURNSTILE_SITE_KEY`；Workers AI 通过 `wrangler.toml` 的 `AI` binding 提供。测试使用模拟响应，不会调用真实方舟。
 
 ## 主要文件
 
@@ -52,6 +59,7 @@ npx.cmd wrangler pages dev . --persist-to .wrangler/state
 - `migrations/0002_create_profile_values.sql`：2.0 文档状态、八卡片与历史表
 - `migrations/0003_add_linear_undo.sql`：复用历史表补充线性撤销身份与恢复时间
 - `tests/api.test.mjs`、`tests/profile.test.mjs`：服务端闭环测试
+- `automation/xhs_course_trial.py`：系统 Edge 单账号 7 天试运行器
 - `school-profile-handoff.md`：2.0 技术交接与发布边界
 - `artifacts/school-archive-desktop.png`：桌面端验收截图
 

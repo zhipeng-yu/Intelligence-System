@@ -13,6 +13,8 @@
 - Pages 已部署碎片累积、线性撤销和符合顺序的彻底删除
 - 生产真实 AI、单步撤销及合成资料 R2/D1 硬删除闭环已完成，生产数据恢复为原有 1 份资料且无悬空画像引用
 - 已配置 Secret：`ADMIN_KEY`、`ARK_API_KEY`、`TURNSTILE_SECRET`、`TURNSTILE_SITE_KEY`
+- 本地已完成小红书固定公开账号的系统 Edge 登录、身份核验和 20 条 ID 基线；未上传、未调用 AI
+- `INGEST_KEY`、新 Pages 源码和 7 天 Windows 任务计划程序尚待本次发布流程配置
 
 管理密钥和管理链接只保存在被 Git 忽略的本地文件或 Cloudflare Secret 中，不得写入仓库、聊天、日志、截图或普通文档。
 
@@ -33,6 +35,7 @@
 - 公开：查看画像、完成度、来源文件名、最近更新、上传资料、触发每份文件唯一一次的自动整理。
 - 管理链接：下载原文件、重试失败整理、撤销最近一次有效画像更新，以及彻底删除失败、未生效或已撤销资料。
 - 公开上传必须通过 Turnstile；同一网络散列每小时最多 5 份。
+- 机器上传仅在 `POST /api/documents` 接受独立 `X-Ingest-Key`；正确密钥只绕过 Turnstile，仍执行来源散列限流和文件扩展名、MIME、文件头、50MB 校验，且不获得任何管理权限。
 - 服务端继续校验扩展名、MIME、文件头和 50MB 上限。
 - 原文件不公开，下载强制附件并设置 `nosniff`；有效更新必须先按顺序撤销，彻底删除同时移除 R2 对象和 D1 文件身份，画像历史匿名保留。
 - AI 输出必须经过八个 section key 白名单、每卡 1–12 个非空条目、去重和 4000 字总长度校验；资料正文被视为不可信数据，不能改变系统指令。
@@ -44,6 +47,7 @@
 Cloudflare 生产环境需要：
 
 - Secret：`ADMIN_KEY`
+- Secret：`INGEST_KEY`
 - Secret：`ARK_API_KEY`
 - Secret：`TURNSTILE_SECRET`
 - Secret：`TURNSTILE_SITE_KEY`（值本身可公开，当前按 Secret 管理）
@@ -71,11 +75,14 @@ npx.cmd wrangler pages deploy . --project-name ledu-school-archive --branch main
 
 ## 已完成的验证
 
-- `node --test tests/api.test.mjs`：6 项通过
+- `node --test tests/api.test.mjs`：7 项通过，覆盖正确/错误 `INGEST_KEY` 和公开 Turnstile 不回退
 - `node --test tests/profile.test.mjs`：7 项通过
+- Conda Python 3.12 环境运行 `tests/test_xhs_course_trial.py`：6 项通过
 - 全新本地 D1 顺序应用 `0001`、`0002`、`0003`
 - 本地已有状态回填验证：`A → B` 被正确补成两个可连续撤销步骤，并保留前一更新时间
 - Pages Functions 构建
+- 小红书运行器锁定已安装技能的关键源码摘要，仅调用系统 Edge；未安装 Playwright Chromium，Edge 适配不注入 stealth、指纹、User-Agent 或验证码绕过脚本
+- 固定账号身份核验和最新 20 条 ID 基线通过；本地状态确认未上传、未调用 AI，且未保存分享查询参数
 - 模拟 D1/R2/方舟响应的上传、私有下载、碎片合并、同值跳过、多卡整体撤销、A/B/C 线性顺序、失败重试、撤销后禁止重试、硬删除与匿名历史测试
 - 新源码已用电脑端 Edge 验收桌面、390px 单列布局、键盘焦点、来源展开、失败重试入口、线性撤销和永久删除确认；控制台无错误，桌面截图已更新
 - 2026-08-26 经用户明确授权应用远端 `0003`，复核无待执行迁移；2026-08-28 从干净的 `main` 部署源码提交 `b370af8`，并由 Edge 确认生产按钮文案为“撤销”
