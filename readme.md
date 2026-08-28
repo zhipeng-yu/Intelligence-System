@@ -4,7 +4,7 @@
 
 生产地址：<https://ledu-school-archive.pages.dev>
 
-生产环境已于 2026-08-26 应用 `0003_add_linear_undo.sql` 并部署源码提交 `8d0f94a`，当前运行碎片累积、线性撤销和符合顺序的彻底删除。生产已用无敏感信息的合成资料完成真实 Workers AI、方舟 Responses API、单步撤销及 R2/D1 硬删除闭环验收。
+生产环境已于 2026-08-26 应用 `0003_add_linear_undo.sql`，并于 2026-08-28 部署源码提交 `b370af8`，当前运行碎片累积、线性撤销和符合顺序的彻底删除。生产已用无敏感信息的合成资料完成真实 Workers AI、方舟 Responses API、单步撤销及 R2/D1 硬删除闭环验收。
 
 ## 产品边界
 
