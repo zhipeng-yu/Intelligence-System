@@ -8,13 +8,13 @@
 - Pages 项目：`ledu-school-archive`
 - D1：`ledu-school-archive`（`1ba7ee18-968d-4598-aad4-8f667454563e`）
 - 私有 R2 bucket：`ledu-school-archive`
-- 生产部署短标识：`a1076bd2`，源码提交 `ec9a231`
-- 远端 D1 已应用到 `0003_add_linear_undo.sql`；源码新增 `0004_add_other_products_section.sql`，已获本次远端应用授权但尚未执行
+- 生产部署短标识：`35577459`，源码提交 `538f8c6`
+- 远端 D1 已应用到 `0004_add_other_products_section.sql`，复核无待执行迁移；生产画像为九张卡片
 - Pages 已部署碎片累积、线性撤销和符合顺序的彻底删除
-- 生产真实 AI、单步撤销及合成资料 R2/D1 硬删除闭环已完成，生产数据恢复为原有 1 份资料且无悬空画像引用
+- 生产真实 AI、单步撤销及合成资料 R2/D1 硬删除闭环已完成；当前保留原有 1 份资料和本次小红书历史演示资料，均无悬空画像引用
 - 已配置 Secret：`ADMIN_KEY`、`INGEST_KEY`、`ARK_API_KEY`、`TURNSTILE_SECRET`、`TURNSTILE_SITE_KEY`
 - 本地已完成小红书固定公开账号的系统 Edge 登录、身份核验和 20 条 ID 基线；基线后全部新增笔记都会记录，旧课程过滤已删除
-- 1 条旧规则产生的历史候选完整保留在 `held_candidates` 且不进入自动队列。任务 `Ledu-Xiaohongshu-Course-Trial` 为 Ready，下一次 9 月 1 日 09:00，仍于 9 月 4 日结束；当前 0 次 AI、0 条待上传、无活动批次
+- 1 条旧规则产生的历史候选完整保留在 `held_candidates` 且不进入自动队列。任务 `Ledu-Xiaohongshu-Course-Trial` 为 Ready，上次 8 月 31 日 09:00 成功，下一次 9 月 1 日 09:00，仍于 9 月 4 日结束；当前已用 1/7 次 AI、0 条待上传、无活动批次且未停机
 
 管理密钥和管理链接只保存在被 Git 忽略的本地文件或 Cloudflare Secret 中，不得写入仓库、聊天、日志、截图或普通文档。
 
@@ -87,7 +87,8 @@ npx.cmd wrangler pages deploy . --project-name ledu-school-archive --branch main
 - 新增判定改为只取主页顶部至第一个已见 ID 的连续前缀；找不到基线锚点即停止，避免把更老笔记当新增
 - Python 默认客户端的生产无文件探针复现 Cloudflare 403；加入透明 `Ledu-XHS-Course-Trial/1.0` 标识后到达现有 `INGEST_KEY` 与“请选择要上传的文件”校验，未创建文档、未调用 AI
 - 上传/AI 的 HTTP 状态和受控错误会写入不含秘密的 `halt_detail`，失败任务返回非零；上传前失败恢复会把历史候选移入 `held_candidates` 并保留全部允许字段
-- 生产源码提交 `ec9a231` 已部署为 `a1076bd2`；未执行 D1 迁移。公开画像返回 200 和八张卡片，无文件、无密钥上传被 Turnstile 以 400 拒绝，未上传且未调用 AI
+- 生产 D1 已应用 `0004` 且无待执行迁移；源码提交 `538f8c6` 已部署为 `35577459`。公开画像返回 200 和九张卡片，完成度分母为 9
+- 历史演示笔记“学而思大阅读 阅写双提升”经系统 Edge 核验后完成机器上传和 1 次生产 AI；文档为 `completed`、作用域仅“其他产品资料”，原八卡校验值未变，旧历史候选仍为 1 条
 - 任务计划核对为 Ready，`StartWhenAvailable=True`、`MultipleInstances=IgnoreNew`、单次上限 1 小时，七日时间边界正确
 - 模拟 D1/R2/方舟响应的上传、私有下载、碎片合并、同值跳过、多卡整体撤销、A/B/C 线性顺序、失败重试、撤销后禁止重试、硬删除与匿名历史测试
 - 新源码已用系统 Edge 验收 9 卡桌面布局、390px 单列、键盘焦点和控制台错误；控制台无错误，桌面截图已更新
@@ -102,5 +103,5 @@ npx.cmd wrangler pages deploy . --project-name ledu-school-archive --branch main
 
 ## 发布边界
 
-- 本次小红书试运行已获授权并完成 `INGEST_KEY` 配置和七日任务计划；本轮另已明确授权 `0004` 远端迁移、Pages 部署及一次历史演示 AI，七日内最多 7 次真实生产 AI 仍由本地配额控制。
+- 本次小红书试运行已完成 `INGEST_KEY` 配置、七日任务计划、`0004` 生产迁移、Pages 部署及一次历史演示 AI；七日内最多 7 次真实生产 AI 仍由本地配额控制，当前已用 1 次。
 - 未授权生产硬删除、超出试运行的生产 AI 调用或规避平台验证；其他生产动作仍须明确授权。

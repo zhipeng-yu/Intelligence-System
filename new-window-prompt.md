@@ -12,7 +12,7 @@
 
 - 固定账号 `565aa55cb8ce1a32c6fdebe7` 已在本机系统 Edge 完成登录、身份核验和最新 20 条 ID 基线。
 - 基线没有生产上传或 AI 调用；本地状态、Edge profile、Conda Python 3.12 环境和 DPAPI 凭据均在 `%LOCALAPPDATA%\LeduSchoolArchive\xhs-course-trial`，不得进入 Git。
-- 生产 `INGEST_KEY` 已配置；1 条旧课程规则产生的历史候选保留在 `held_candidates` 且不进入自动队列。任务下一次 9 月 1 日 09:00，仍于 9 月 4 日结束；实时状态以本地状态文件和 `handoff.md` 为准。
+- 生产 `INGEST_KEY` 已配置，生产 D1 已应用 `0004`，Pages 已部署源码提交 `538f8c6`；一次历史演示已完成并使用 1/7 次 AI。1 条旧课程规则产生的历史候选仍保留在 `held_candidates` 且不进入自动队列；任务下一次 9 月 1 日 09:00，仍于 9 月 4 日结束，实时状态以本地状态文件和 `handoff.md` 为准。
 
 ## 固定运行边界
 
@@ -27,5 +27,5 @@
 - 机器上传只使用现有 `POST /api/documents` 的独立 `INGEST_KEY`，仅绕过 Turnstile；网络散列限流、PDF/DOCX/XLSX、50MB、扩展名/MIME/文件头校验保持，不得使用 `ADMIN_KEY`。
 - 上传后继续调用现有 `/api/documents/{id}/analyze`。正确 `INGEST_KEY` 上传固定标记为“其他产品资料”，工具 schema 与返回解析都只能更新第九卡；普通上传只能更新原八张学校画像。第九卡保留最新 12 条，全部记录保存在每日 PDF。
 - 仅新增 `0004_add_other_products_section.sql` 无损扩展 `profile_sections` key 约束，不增加表、队列、框架、依赖、服务、上传端点、快照、来源表、重做或分支。
-- 本任务已授权最小代码修改、正常提交和快进推送、生产 Pages 部署、远端应用仅 `0004`、一次历史演示 AI，以及试运行最多 7 次真实生产 AI；未授权生产硬删除或规避平台验证。
+- 本任务的最小代码修改、生产 `0004`、Pages 部署和一次历史演示 AI 已完成；试运行最多 7 次真实生产 AI 的授权与本地配额仍有效，当前已用 1 次。未授权生产硬删除或规避平台验证。
 - 每次生产动作前重新 fetch 并核对远端。完成后更新交接文件，只暂存本次文件，验证后正常提交、再次核对并快进推送；禁止强推。
