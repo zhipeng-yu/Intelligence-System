@@ -10,7 +10,7 @@
 
 仓库包含一个本地试运行器 `automation/xhs_course_trial.py`：它复用锁定提交的 `xiaohongshu-skill`，但只启动本机系统 Edge，不下载 Chromium，不注入 stealth、指纹伪装或验证码绕过。它只监控固定公开主页 ID `565aa55cb8ce1a32c6fdebe7`，不持久化 `xsec_token`、分享参数、全文、图片、视频、评论或用户信息。
 
-首次系统 Edge 登录、账号身份核验和最新 20 条 ID 基线已完成；该步骤没有上传文件或调用 AI。生产 `INGEST_KEY` 和 Pages 已启用，任务计划于 2026-08-29 至 2026-09-04 每日 09:00 运行。运行状态、Edge profile、Conda 环境和 Windows DPAPI 加密凭据位于 `%LOCALAPPDATA%\LeduSchoolArchive\xhs-course-trial`，不进入 Git；实时状态见 `handoff.md`。
+首次系统 Edge 登录、账号身份核验和最新 20 条 ID 基线已完成。运行器只把主页顶部到第一个已见 ID 之间的笔记视为新增；历史候选保留在 `held_candidates`，不会进入上传队列。机器 HTTP 请求使用透明客户端标识，失败状态保存安全的 HTTP 状态和服务端错误，任务失败返回非零。任务仍按原周期运行至 2026-09-04，不补跑或延长失败日；运行状态、Edge profile、Conda 环境和 DPAPI 凭据位于 `%LOCALAPPDATA%\LeduSchoolArchive\xhs-course-trial`，不进入 Git。
 
 ## 产品边界
 

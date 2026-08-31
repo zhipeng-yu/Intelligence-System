@@ -1,6 +1,6 @@
 # 学校资料库运维交接
 
-更新日期：2026-08-28
+更新日期：2026-08-31
 
 ## 当前状态
 
@@ -13,8 +13,8 @@
 - Pages 已部署碎片累积、线性撤销和符合顺序的彻底删除
 - 生产真实 AI、单步撤销及合成资料 R2/D1 硬删除闭环已完成，生产数据恢复为原有 1 份资料且无悬空画像引用
 - 已配置 Secret：`ADMIN_KEY`、`INGEST_KEY`、`ARK_API_KEY`、`TURNSTILE_SECRET`、`TURNSTILE_SITE_KEY`
-- 本地已完成小红书固定公开账号的系统 Edge 登录、身份核验和 20 条 ID 基线；未上传、未调用 AI
-- Windows 任务 `Ledu-Xiaohongshu-Course-Trial` 为 Ready：2026-08-29 至 2026-09-04 每日 09:00，错过则开机补跑，2026-09-05 00:00 截止；当前 0 次 AI、无待处理条目和活动批次
+- 本地已完成小红书固定公开账号的系统 Edge 登录、身份核验和 20 条 ID 基线；8 月 29 日没有成功上传或调用 AI
+- 8 月 29 日的历史误判和 Python 上传 403 已于 8 月 31 日修复；1 条历史候选完整保留在 `held_candidates` 且不上传。任务 `Ledu-Xiaohongshu-Course-Trial` 为 Ready，下一次 9 月 1 日 09:00，仍于 9 月 4 日结束；当前 0 次 AI、0 条待上传、无活动批次
 
 管理密钥和管理链接只保存在被 Git 忽略的本地文件或 Cloudflare Secret 中，不得写入仓库、聊天、日志、截图或普通文档。
 
@@ -77,12 +77,15 @@ npx.cmd wrangler pages deploy . --project-name ledu-school-archive --branch main
 
 - `node --test tests/api.test.mjs`：7 项通过，覆盖正确/错误 `INGEST_KEY` 和公开 Turnstile 不回退
 - `node --test tests/profile.test.mjs`：7 项通过
-- Conda Python 3.12 环境运行 `tests/test_xhs_course_trial.py`：6 项通过
+- Conda Python 3.12 环境运行 `tests/test_xhs_course_trial.py`：10 项通过
 - 全新本地 D1 顺序应用 `0001`、`0002`、`0003`
 - 本地已有状态回填验证：`A → B` 被正确补成两个可连续撤销步骤，并保留前一更新时间
 - Pages Functions 构建
 - 小红书运行器锁定已安装技能的关键源码摘要，仅调用系统 Edge；未安装 Playwright Chromium，Edge 适配不注入 stealth、指纹、User-Agent 或验证码绕过脚本
 - 固定账号身份核验和最新 20 条 ID 基线通过；本地状态确认未上传、未调用 AI，且未保存分享查询参数
+- 新增判定改为只取主页顶部至第一个已见 ID 的连续前缀；找不到基线锚点即停止，避免把更老笔记当新增
+- Python 默认客户端的生产无文件探针复现 Cloudflare 403；加入透明 `Ledu-XHS-Course-Trial/1.0` 标识后到达现有 `INGEST_KEY` 与“请选择要上传的文件”校验，未创建文档、未调用 AI
+- 上传/AI 的 HTTP 状态和受控错误会写入不含秘密的 `halt_detail`，失败任务返回非零；上传前失败恢复会把历史候选移入 `held_candidates` 并保留全部允许字段
 - 生产源码提交 `ec9a231` 已部署为 `a1076bd2`；未执行 D1 迁移。公开画像返回 200 和八张卡片，无文件、无密钥上传被 Turnstile 以 400 拒绝，未上传且未调用 AI
 - 任务计划核对为 Ready，`StartWhenAvailable=True`、`MultipleInstances=IgnoreNew`、单次上限 1 小时，七日时间边界正确
 - 模拟 D1/R2/方舟响应的上传、私有下载、碎片合并、同值跳过、多卡整体撤销、A/B/C 线性顺序、失败重试、撤销后禁止重试、硬删除与匿名历史测试

@@ -12,7 +12,7 @@
 
 - 固定账号 `565aa55cb8ce1a32c6fdebe7` 已在本机系统 Edge 完成登录、身份核验和最新 20 条 ID 基线。
 - 基线没有生产上传或 AI 调用；本地状态、Edge profile、Conda Python 3.12 环境和 DPAPI 凭据均在 `%LOCALAPPDATA%\LeduSchoolArchive\xhs-course-trial`，不得进入 Git。
-- 生产 `INGEST_KEY` 和源码提交 `ec9a231` 已部署；Windows 任务在 2026-08-29 至 2026-09-04 每日 09:00 运行，实时状态以本地状态文件和 `handoff.md` 为准。
+- 生产 `INGEST_KEY` 和源码提交 `ec9a231` 已部署。8 月 29 日的历史误判和 Python 上传 403 已于 8 月 31 日修复；1 条历史候选保留在 `held_candidates` 且不上传。任务已恢复，下一次 9 月 1 日 09:00，仍于 9 月 4 日结束；实时状态以本地状态文件和 `handoff.md` 为准。
 
 ## 固定运行边界
 

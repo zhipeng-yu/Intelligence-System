@@ -24,6 +24,7 @@ from pathlib import Path
 TARGET_USER_ID = "565aa55cb8ce1a32c6fdebe7"
 SKILL_COMMIT = "afa96802d3e61cdd5e7bd7b37ec59182bbe07d37"
 SITE = "https://ledu-school-archive.pages.dev"
+HTTP_USER_AGENT = "Ledu-XHS-Course-Trial/1.0"
 EDGE = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
 CHINA_TZ = timezone(timedelta(hours=8), "Asia/Shanghai")
 ROOT = Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir())) / "LeduSchoolArchive" / "xhs-course-trial"
@@ -91,7 +92,9 @@ def notify(title: str, message: str) -> None:
 
 
 def halt(state: dict, code: str, message: str) -> None:
-    state.update({"halted": True, "halt_reason": code, "status": "halted", "updated_at": iso_now()})
+    detail = re.sub(r"\s+", " ", str(message)).strip()[:180]
+    state.update({"halted": True, "halt_reason": code, "halt_detail": detail,
+                  "status": "halted", "updated_at": iso_now()})
     atomic_json(STATE_PATH, state)
     notify("小红书课程试运行已停止", message)
 
@@ -254,6 +257,15 @@ def clean_feeds(feeds: object) -> list[dict]:
     return sorted(unique.values(), key=feed_timestamp, reverse=True)
 
 
+def new_feeds_before_seen(feeds: list[dict], seen_ids: set[str]) -> list[dict]:
+    result = []
+    for feed in feeds:
+        if feed["id"] in seen_ids:
+            return result
+        result.append(feed)
+    raise StopTrial("identity", "主页列表未遇到已见基线锚点，无法安全判断新增笔记")
+
+
 def get_profile(client, user_action) -> tuple[dict, list[dict]]:
     client.navigate(f"https://www.xiaohongshu.com/user/profile/{TARGET_USER_ID}")
     client.wait_for_initial_state(timeout=30000, retries=0)
@@ -321,10 +333,12 @@ def baseline() -> None:
         "start_date": None,
         "end_date": None,
         "pending": [],
+        "held_candidates": [],
         "ai_dates": [],
         "active_batch": None,
         "halted": False,
         "halt_reason": None,
+        "halt_detail": None,
         "status": "baseline_ready",
         "updated_at": timestamp,
     })
@@ -462,7 +476,7 @@ def collect_new(seen_ids: set[str]) -> tuple[list[str], list[dict]]:
         if not logged_in:
             raise StopTrial("login", "小红书登录已失效，请在 Edge 中重新登录")
         _, feeds = get_profile(client, user_action)
-        new_feeds = [feed for feed in feeds if feed["id"] not in seen_ids]
+        new_feeds = new_feeds_before_seen(feeds, seen_ids)
         products = []
         action = feed_action(client)
         for feed in sorted(new_feeds, key=feed_timestamp):
@@ -543,7 +557,17 @@ def json_request(request: urllib.request.Request, stage: str) -> dict:
     try:
         with urllib.request.urlopen(request, timeout=60) as response:
             value = json.loads(response.read().decode("utf-8"))
-    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
+    except urllib.error.HTTPError as error:
+        detail = ""
+        try:
+            payload = json.loads(error.read(4096).decode("utf-8"))
+            if isinstance(payload, dict) and isinstance(payload.get("error"), str):
+                detail = re.sub(r"\s+", " ", payload["error"]).strip()[:120]
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            pass
+        suffix = f"：{detail}" if detail else ""
+        raise StopTrial(stage, f"生产 {label} 请求失败（HTTP {error.code}）{suffix}") from error
+    except (urllib.error.URLError, TimeoutError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise StopTrial(stage, f"生产 {label} 请求异常，已停止") from error
     if not isinstance(value, dict):
         raise StopTrial(stage, f"生产 {label} 响应无效，已停止")
@@ -566,7 +590,8 @@ def upload_and_analyze(state: dict, batch: list[dict], day: str) -> None:
         body, boundary = multipart(pdf_path)
         upload = urllib.request.Request(
             f"{SITE}/api/documents", data=body, method="POST",
-            headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "X-Ingest-Key": key},
+            headers={"Content-Type": f"multipart/form-data; boundary={boundary}", "X-Ingest-Key": key,
+                     "User-Agent": HTTP_USER_AGENT, "Accept": "application/json"},
         )
         uploaded = json_request(upload, "upload")
         document_id = uploaded.get("document", {}).get("id")
@@ -576,7 +601,10 @@ def upload_and_analyze(state: dict, batch: list[dict], day: str) -> None:
         state.setdefault("ai_dates", []).append(day)
         state["active_batch"]["stage"] = "analyzing"
         atomic_json(STATE_PATH, state)
-        analyze = urllib.request.Request(f"{SITE}/api/documents/{document_id}/analyze", data=b"", method="POST")
+        analyze = urllib.request.Request(
+            f"{SITE}/api/documents/{document_id}/analyze", data=b"", method="POST",
+            headers={"User-Agent": HTTP_USER_AGENT, "Accept": "application/json"},
+        )
         analyzed = json_request(analyze, "ai")
         if analyzed.get("ai_status") != "completed":
             raise StopTrial("ai", "生产 AI 未完成，已停止")
@@ -630,29 +658,57 @@ def run_once(state: dict, seen: dict) -> None:
     upload_and_analyze(state, state["pending"][:10], day)
 
 
-def run_daily() -> None:
+def run_daily() -> bool:
     try:
         state = read_json(STATE_PATH)
         seen = read_json(SEEN_PATH)
     except StopTrial as error:
         notify("小红书课程试运行已停止", str(error))
-        return
+        return False
     if state.get("halted"):
-        return
+        return False
     for attempt in range(2):
         try:
             run_once(state, seen)
-            return
+            return True
         except ReadNetworkError:
             if attempt == 0:
                 notify("小红书课程试运行", "临时网络错误，15 分钟后仅重试一次")
                 time.sleep(15 * 60)
                 continue
             halt(state, "network", "小红书网络重试仍失败，后续任务已停止")
-            return
+            return False
         except StopTrial as error:
             halt(state, error.code, str(error))
-            return
+            return False
+
+
+def is_historical_candidate(item: dict, baseline_at: str) -> bool:
+    try:
+        return datetime.fromisoformat(str(item.get("published_at"))) < datetime.fromisoformat(baseline_at)
+    except (TypeError, ValueError):
+        return False
+
+
+def resume_after_fix() -> None:
+    state = read_json(STATE_PATH)
+    batch = state.get("active_batch")
+    if (state.get("halt_reason") != "upload" or not isinstance(batch, dict)
+            or batch.get("stage") != "uploading" or batch.get("document_id")):
+        raise StopTrial("state", "当前状态不是可安全恢复的上传前失败")
+    baseline_at = str(state.get("baseline_at") or "")
+    held = {item.get("note_id"): item for item in state.get("held_candidates", []) if isinstance(item, dict)}
+    pending = []
+    for item in state.get("pending", []):
+        if isinstance(item, dict) and is_historical_candidate(item, baseline_at):
+            held[item.get("note_id")] = item
+        elif isinstance(item, dict):
+            pending.append(item)
+    state.update({"pending": pending, "held_candidates": list(held.values()), "active_batch": None,
+                  "halted": False, "halt_reason": None, "halt_detail": None,
+                  "status": "ready", "updated_at": iso_now()})
+    atomic_json(STATE_PATH, state)
+    print(f"试运行已恢复；保留历史候选 {len(held)} 条，待处理新增 {len(pending)} 条。")
 
 
 def provision_secret(repo: Path) -> None:
@@ -707,7 +763,8 @@ def schedule(repo: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("baseline", "repair-login", "run", "provision-secret", "schedule"))
+    parser.add_argument("command", choices=("baseline", "repair-login", "run", "provision-secret", "schedule",
+                                             "resume-after-fix"))
     parser.add_argument("--repo", type=Path, default=Path(__file__).resolve().parents[1])
     args = parser.parse_args()
     try:
@@ -716,11 +773,13 @@ def main() -> int:
         elif args.command == "repair-login":
             repair_login()
         elif args.command == "run":
-            run_daily()
+            return 0 if run_daily() else 1
         elif args.command == "provision-secret":
             provision_secret(args.repo.resolve())
-        else:
+        elif args.command == "schedule":
             schedule(args.repo.resolve())
+        else:
+            resume_after_fix()
         return 0
     except StopTrial as error:
         print(str(error), file=sys.stderr)
