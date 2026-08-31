@@ -3,6 +3,8 @@ const encoder = new TextEncoder();
 export const CATEGORIES = ['学校信息', '教学进度', '试卷资料', '家长与情报', '活动与产品'];
 export const MAX_FILE_SIZE = 50 * 1024 * 1024;
 export const MAX_SECTION_CONTENT = 4000;
+export const MACHINE_XHS_SCOPE = '其他产品资料';
+export const OTHER_PRODUCTS_SECTION_KEY = 'other_products';
 export const PROFILE_SECTIONS = [
   ['school_overview', '学校概况'],
   ['calendar_schedule', '校历与作息'],
@@ -11,9 +13,13 @@ export const PROFILE_SECTIONS = [
   ['exams', '考试安排与范围'],
   ['teaching_focus', '教学重点、难点与常见失分'],
   ['activities', '近期活动与通知'],
-  ['resources', '可用教学资源']
+  ['resources', '可用教学资源'],
+  [OTHER_PRODUCTS_SECTION_KEY, '其他产品资料']
 ].map(([key, label]) => ({ key, label }));
 export const PROFILE_SECTION_BY_KEY = new Map(PROFILE_SECTIONS.map(section => [section.key, section]));
+export const SCHOOL_PROFILE_SECTION_KEYS = new Set(
+  PROFILE_SECTIONS.map(section => section.key).filter(key => key !== OTHER_PRODUCTS_SECTION_KEY)
+);
 
 const FILE_TYPES = {
   pdf: {

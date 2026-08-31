@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Seven-day, single-account Xiaohongshu course-product trial."""
+"""Seven-day, single-account Xiaohongshu public-note trial."""
 
 from __future__ import annotations
 
@@ -96,7 +96,7 @@ def halt(state: dict, code: str, message: str) -> None:
     state.update({"halted": True, "halt_reason": code, "halt_detail": detail,
                   "status": "halted", "updated_at": iso_now()})
     atomic_json(STATE_PATH, state)
-    notify("小红书课程试运行已停止", message)
+    notify("小红书笔记试运行已停止", message)
 
 
 class DataBlob(ctypes.Structure):
@@ -297,7 +297,7 @@ def wait_for_login(client, login_action, timeout: int = 600) -> None:
     logged_in, _ = action.check_login_status(navigate=True)
     if logged_in:
         return
-    notify("小红书课程试运行", "请在已打开的 Edge 中完成小红书登录")
+    notify("小红书笔记试运行", "请在已打开的 Edge 中完成小红书登录")
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if client._check_captcha():
@@ -342,7 +342,7 @@ def baseline() -> None:
         "status": "baseline_ready",
         "updated_at": timestamp,
     })
-    notify("小红书课程试运行", "目标账号已核验，20 条笔记基线已建立，未上传且未调用 AI")
+    notify("小红书笔记试运行", "目标账号已核验，20 条笔记基线已建立，未上传且未调用 AI")
     print("基线已完成：20 条 ID，未上传，未调用 AI。")
 
 
@@ -359,7 +359,7 @@ def repair_login() -> None:
     if state.get("halt_reason") in {"login", "security", "identity"}:
         state.update({"halted": False, "halt_reason": None, "status": "ready", "updated_at": iso_now()})
         atomic_json(STATE_PATH, state)
-    notify("小红书课程试运行", "Edge 登录与目标账号已重新核验")
+    notify("小红书笔记试运行", "Edge 登录与目标账号已重新核验")
 
 
 def note_value(detail: dict) -> dict:
@@ -388,24 +388,6 @@ def note_text(detail: dict) -> tuple[str, str, int]:
     return title, description, published
 
 
-def is_course_product(title: str, description: str) -> bool:
-    text = f"{title} {description}"
-    explicit = re.search(r"课程包|课包|系统课|教师培训课|教师培训|老师培训|师训|课程", text)
-    offered = re.search(r"报名|招生|开课|课时|上线|试听|购买|价格|学费|原价|现价|优惠|限时|早鸟|适用|适合|课程包|课包|师训|培训课", text)
-    if not explicit or not offered:
-        return False
-    clear_product_title = re.search(r"课程包|课包|系统课|教师培训|老师培训|培训课|师训", title)
-    if re.search(r"文具|打印机|学习机|平板|电子设备|单独教材", text) and not clear_product_title:
-        return False
-    if re.search(r"观点|随笔|聊聊|复盘|心得|课程设计思路", title) and not re.search(r"报名|招生|开课|价|优惠|购买", text):
-        return False
-    if re.search(r"日常|打卡|vlog|记录生活|随手拍|个人动态", title, flags=re.IGNORECASE) and not clear_product_title:
-        return False
-    if re.search(r"活动|讲座|分享会|沙龙", title) and not clear_product_title:
-        return False
-    return True
-
-
 def first_matches(pattern: str, text: str, limit: int = 3) -> str:
     values = []
     for match in re.finditer(pattern, text, flags=re.IGNORECASE):
@@ -415,41 +397,46 @@ def first_matches(pattern: str, text: str, limit: int = 3) -> str:
     return "、".join(values[:limit])
 
 
-def extract_product(note_id: str, detail: dict, fallback_title: str = "") -> dict | None:
+def extract_note_record(note_id: str, detail: dict, fallback_title: str = "") -> dict:
     title, description, published = note_text(detail)
-    title = title or text_value(fallback_title)
-    if not is_course_product(title, description):
-        return None
+    title = title or text_value(fallback_title) or "无标题笔记"
     text = f"{title}。{description}"
-    model = first_matches(r"第\s*\d+\s*期|20\d{2}\s*年?\s*[春夏秋冬寒暑][^\s，。；]{0,6}|(?:基础|进阶|高阶|标准|旗舰|升级)版", text, 2) or "未注明"
-    price = first_matches(r"(?:[\u00a5￥]\s*)?\d+(?:\.\d{1,2})?\s*元(?:\s*/\s*[^\s，。；]{1,8})?|[\u00a5￥]\s*\d+(?:\.\d{1,2})?", text) or "未公开"
-    promo_sentence = next((part for part in re.split(r"[\n。！？；]", text)
-                           if re.search(r"优惠|限时|早鸟|立减|折扣|团购|赠送|满减|原价|现价", part)), "")
-    promotion = text_value(promo_sentence)[:120] or "未公开"
+    topics = first_matches(
+        r"课程包|课包|系统课|教师培训|师训|课程|教材|阅读|写作|语文|数学|英语|物理|化学|"
+        r"科学|编程|教育|文具|学习机|活动|讲座|分享会|日常", text, 6
+    )
+    price = first_matches(
+        r"(?:[\u00a5￥]\s*)?\d+(?:\.\d{1,2})?\s*元(?:\s*/\s*[^\s，。；]{1,8})?|"
+        r"[\u00a5￥]\s*\d+(?:\.\d{1,2})?", text
+    )
+    promotions = first_matches(r"优惠|限时|早鸟|立减|折扣|团购|赠送|满减|原价|现价", text, 4)
     grades = first_matches(r"幼儿园|学前|小学|[\u4e00二三四五六123456]年级|初中|[\u4e03八九789]年级|高中|教师|老师", text, 5)
     subjects = first_matches(r"语文|数学|英语|物理|化学|生物|政治|历史|地理|科学|信息技术|美术|音乐|体育", text, 5)
     audience = " / ".join(value for value in (grades, subjects) if value) or "未注明"
     publish_time = datetime.fromtimestamp(published, CHINA_TZ).isoformat(timespec="minutes") if published else "未注明"
-    product_name = title[:80] or "未注明"
+    facts = []
+    if topics:
+        facts.append(f"明确主题词包括{topics}")
+    if price:
+        facts.append(f"公开价格信息为{price}")
+    if promotions:
+        facts.append(f"优惠关键词包括{promotions}")
+    if audience != "未注明":
+        facts.append(f"适用年级/学科为{audience}")
+    fact_sentence = "；".join(facts) if facts else "未识别到可结构化的主题、价格、优惠或适用对象信息"
     summary = (
-        f"原文明确介绍“{product_name[:36]}”课程产品，型号/版本为{model[:24]}；"
-        f"公开价格为{price[:36]}，优惠活动为{promotion[:45]}；适用年级/学科为{audience[:36]}。"
-        f"笔记发布时间为{publish_time}，来源为固定公开主页 ID {TARGET_USER_ID}。"
-        "本摘要仅整理原文明示事实，未公开信息不作推测。"
+        f"该公开笔记标题为“{title[:40]}”，发布时间为{publish_time}，"
+        f"来源为固定公开主页 ID {TARGET_USER_ID}。{fact_sentence}。"
+        "本摘要由固定规则整理，不推测未明示信息，也不保存正文、图片、视频、评论或用户信息。"
     )
     if len(summary) < 100:
-        summary += "未保存原文全文、图片、视频、评论或用户信息。"
+        summary += "公开链接已清除临时查询参数。"
     summary = summary[:199].rstrip("，；。") + "。" if len(summary) > 200 else summary
     return {
         "note_id": note_id,
-        "product_name": product_name,
-        "model": model,
-        "price": price,
-        "promotion": promotion,
-        "published_at": publish_time,
-        "audience": audience,
-        "source_account": TARGET_USER_ID,
         "original_title": title[:120],
+        "published_at": publish_time,
+        "source_account": TARGET_USER_ID,
         "url": f"https://www.xiaohongshu.com/explore/{note_id}",
         "summary": summary,
     }
@@ -477,7 +464,7 @@ def collect_new(seen_ids: set[str]) -> tuple[list[str], list[dict]]:
             raise StopTrial("login", "小红书登录已失效，请在 Edge 中重新登录")
         _, feeds = get_profile(client, user_action)
         new_feeds = new_feeds_before_seen(feeds, seen_ids)
-        products = []
+        records = []
         action = feed_action(client)
         for feed in sorted(new_feeds, key=feed_timestamp):
             token = text_value(feed.get("xsecToken"))
@@ -487,10 +474,8 @@ def collect_new(seen_ids: set[str]) -> tuple[list[str], list[dict]]:
             if not detail:
                 raise ReadNetworkError("笔记详情临时不可用")
             fallback = text_value(feed.get("noteCard", {}).get("displayTitle"))
-            product = extract_product(feed["id"], detail, fallback)
-            if product:
-                products.append(product)
-        return [feed["id"] for feed in new_feeds], products
+            records.append(extract_note_record(feed["id"], detail, fallback))
+        return [feed["id"] for feed in new_feeds], records
     except (StopTrial, ReadNetworkError):
         raise
     except Exception as error:
@@ -499,32 +484,31 @@ def collect_new(seen_ids: set[str]) -> tuple[list[str], list[dict]]:
         client.close()
 
 
-def report_html(products: list[dict]) -> str:
+def report_html(records: list[dict]) -> str:
     rows = []
     labels = [
-        ("product_name", "产品名"), ("model", "型号/版本"), ("price", "公开价格"),
-        ("promotion", "优惠活动"), ("published_at", "发布时间"), ("audience", "适用年级/学科"),
-        ("source_account", "来源账号"), ("original_title", "原文标题"), ("url", "公开链接"),
+        ("original_title", "原文标题"), ("published_at", "发布时间"),
+        ("source_account", "来源账号"), ("url", "公开链接"),
         ("summary", "事实摘要"),
     ]
-    for index, product in enumerate(products, 1):
+    for index, record in enumerate(records, 1):
         fields = "".join(
-            f"<dt>{html.escape(label)}</dt><dd>{html.escape(str(product[key]))}</dd>" for key, label in labels
+            f"<dt>{html.escape(label)}</dt><dd>{html.escape(str(record[key]))}</dd>" for key, label in labels
         )
-        rows.append(f"<section><h2>{index}. {html.escape(product['product_name'])}</h2><dl>{fields}</dl></section>")
+        rows.append(f"<section><h2>{index}. {html.escape(record['original_title'])}</h2><dl>{fields}</dl></section>")
     return """<!doctype html><meta charset="utf-8"><style>
     @page{size:A4;margin:16mm}body{font-family:'Microsoft YaHei',sans-serif;color:#222;font-size:11pt;line-height:1.6}
     h1{font-size:20pt}h2{font-size:14pt;border-bottom:1px solid #bbb;padding-bottom:4px}section{break-inside:avoid;margin:0 0 16px}
     dl{display:grid;grid-template-columns:110px 1fr;gap:4px 10px}dt{font-weight:700}dd{margin:0;overflow-wrap:anywhere}
-    </style><h1>小红书公开课程产品日报</h1>""" + "".join(rows)
+    </style><h1>小红书公开笔记日报</h1>""" + "".join(rows)
 
 
-def make_pdf(products: list[dict]) -> Path:
+def make_pdf(records: list[dict]) -> Path:
     ROOT.mkdir(parents=True, exist_ok=True)
     html_path = ROOT / f"report-{secrets.token_hex(6)}.html"
     pdf_path = html_path.with_suffix(".pdf")
     try:
-        html_path.write_text(report_html(products), encoding="utf-8")
+        html_path.write_text(report_html(records), encoding="utf-8")
         result = subprocess.run(
             [str(EDGE), "--headless=new", "--disable-gpu", "--no-pdf-header-footer",
              f"--print-to-pdf={pdf_path}", html_path.resolve().as_uri()],
@@ -540,10 +524,10 @@ def make_pdf(products: list[dict]) -> Path:
 
 def multipart(file_path: Path) -> tuple[bytes, str]:
     boundary = f"----ledu{secrets.token_hex(16)}"
-    filename = f"xiaohongshu-course-{now().date().isoformat()}.pdf"
+    filename = f"xiaohongshu-notes-{now().date().isoformat()}.pdf"
     chunks = [
         (f"--{boundary}\r\nContent-Disposition: form-data; name=\"note\"\r\n\r\n"
-         "小红书公开课程产品 7 天最小试运行\r\n").encode("utf-8"),
+         "小红书公开笔记 7 天最小试运行\r\n").encode("utf-8"),
         (f"--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{filename}\"\r\n"
          "Content-Type: application/pdf\r\n\r\n").encode("utf-8"),
         file_path.read_bytes(),
@@ -613,7 +597,7 @@ def upload_and_analyze(state: dict, batch: list[dict], day: str) -> None:
         state.update({"active_batch": None, "status": "completed", "last_completed_date": day,
                       "updated_at": iso_now()})
         atomic_json(STATE_PATH, state)
-        notify("小红书课程试运行", f"{day} 已上传 {len(batch)} 条公开课程产品并完成 AI 整理")
+        notify("小红书试运行", f"{day} 已上传 {len(batch)} 条公开笔记并完成 AI 整理")
     finally:
         key = ""
         pdf_path.unlink(missing_ok=True)
@@ -631,24 +615,24 @@ def run_once(state: dict, seen: dict) -> None:
         if state.get("status") != "ended":
             state.update({"status": "ended", "updated_at": iso_now()})
             atomic_json(STATE_PATH, state)
-            notify("小红书课程试运行", "7 个自然日试运行已结束，失败日未延长周期")
+            notify("小红书笔记试运行", "7 个自然日试运行已结束，失败日未延长周期")
         return
     if state.get("active_batch"):
         raise StopTrial("upload", "上次上传或 AI 结果不确定，为防止重复已停止")
     known = set(seen.get("ids", []))
-    new_ids, products = collect_new(known)
+    new_ids, records = collect_new(known)
     if new_ids:
         seen["ids"] = list(dict.fromkeys(seen.get("ids", []) + new_ids))
         seen["updated_at"] = iso_now()
         atomic_json(SEEN_PATH, seen)
     pending_by_id = {item["note_id"]: item for item in state.get("pending", []) if isinstance(item, dict)}
-    for product in products:
-        pending_by_id[product["note_id"]] = product
+    for record in records:
+        pending_by_id[record["note_id"]] = record
     state["pending"] = list(pending_by_id.values())
     state.update({"last_scan_date": day, "status": "ready", "updated_at": iso_now()})
     atomic_json(STATE_PATH, state)
     if not state["pending"]:
-        state["status"] = "no_course_products"
+        state["status"] = "no_new_notes"
         atomic_json(STATE_PATH, state)
         return
     if day in state.get("ai_dates", []):
@@ -663,7 +647,7 @@ def run_daily() -> bool:
         state = read_json(STATE_PATH)
         seen = read_json(SEEN_PATH)
     except StopTrial as error:
-        notify("小红书课程试运行已停止", str(error))
+        notify("小红书笔记试运行已停止", str(error))
         return False
     if state.get("halted"):
         return False
@@ -673,7 +657,7 @@ def run_daily() -> bool:
             return True
         except ReadNetworkError:
             if attempt == 0:
-                notify("小红书课程试运行", "临时网络错误，15 分钟后仅重试一次")
+                notify("小红书笔记试运行", "临时网络错误，15 分钟后仅重试一次")
                 time.sleep(15 * 60)
                 continue
             halt(state, "network", "小红书网络重试仍失败，后续任务已停止")

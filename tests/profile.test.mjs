@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { MAX_SECTION_CONTENT, PROFILE_SECTIONS } from '../functions/_shared.js';
+import {
+  MACHINE_XHS_SCOPE,
+  MAX_SECTION_CONTENT,
+  OTHER_PRODUCTS_SECTION_KEY,
+  PROFILE_SECTIONS
+} from '../functions/_shared.js';
 import { onRequestGet } from '../functions/api/profile/index.js';
 import { onRequestPost as onRequestUndo } from '../functions/api/profile/undo.js';
 import { onRequestPost as onRequestAnalyze, parseProfileUpdates } from '../functions/api/documents/[id]/analyze.js';
@@ -241,8 +246,8 @@ async function undo(bindings, authorized = true) {
   });
 }
 
-function addAnalyzable(bindings, id, response) {
-  bindings.DB.addDocument(id);
+function addAnalyzable(bindings, id, response, values = {}) {
+  bindings.DB.addDocument(id, values);
   bindings.BUCKET.add(`documents/${id}`);
   bindings.ARK_FETCH = async () => arkResponse(response);
 }
@@ -251,7 +256,7 @@ test('profile is public, exposes active card sources, and only advertises undo t
   const bindings = env();
   const empty = await profile(bindings);
   assert.equal(empty.profile.filled, 0);
-  assert.equal(empty.profile.total, 8);
+  assert.equal(empty.profile.total, 9);
   assert.equal(empty.profile.percentage, 0);
   assert.equal(empty.can_undo, false);
 
@@ -295,6 +300,47 @@ test('AI receives the current profile and stores a deduplicated complete merged 
   assert.equal(bindings.DB.history[0].content, '旧校区\n保留项目');
   assert.equal(bindings.DB.history[0].previous_updated_at, '2026-08-25T00:00:00.000Z');
   assert.deepEqual((await response.json()).updated_sections, ['school_overview']);
+});
+
+test('Xiaohongshu machine material can update only the other products card', async () => {
+  const bindings = env();
+  Object.assign(bindings.DB.sections.get('resources'), { content: '原有教学资源' });
+  addAnalyzable(bindings, 'doc-xhs', {
+    updates: [{ section_key: OTHER_PRODUCTS_SECTION_KEY, items: ['2026-08-31｜公开笔记示例'] }]
+  }, { scope: MACHINE_XHS_SCOPE });
+  let requestBody;
+  bindings.ARK_FETCH = async (_url, options) => {
+    requestBody = JSON.parse(options.body);
+    return arkResponse({
+      updates: [{ section_key: OTHER_PRODUCTS_SECTION_KEY, items: ['2026-08-31｜公开笔记示例'] }]
+    });
+  };
+
+  const response = await analyze(bindings, 'doc-xhs');
+  assert.equal(response.status, 200);
+  assert.match(requestBody.input, /只能更新“其他产品资料”卡片/);
+  assert.deepEqual(requestBody.tools[0].parameters.properties.updates.items.properties.section_key.enum,
+    [OTHER_PRODUCTS_SECTION_KEY]);
+  assert.equal(bindings.DB.sections.get(OTHER_PRODUCTS_SECTION_KEY).content, '2026-08-31｜公开笔记示例');
+  assert.equal(bindings.DB.sections.get('resources').content, '原有教学资源');
+  assert.equal(bindings.DB.documents.get('doc-xhs').scope, MACHINE_XHS_SCOPE);
+  assert.equal((await undo(bindings)).status, 200);
+  assert.equal(bindings.DB.sections.get(OTHER_PRODUCTS_SECTION_KEY).content, '');
+  assert.equal(bindings.DB.sections.get('resources').content, '原有教学资源');
+});
+
+test('Xiaohongshu machine material rejects an update to an original school card', async () => {
+  const bindings = env();
+  addAnalyzable(bindings, 'doc-xhs-bad', {
+    updates: [{ section_key: 'resources', items: ['不得写入'] }]
+  }, { scope: MACHINE_XHS_SCOPE });
+  const originalConsoleError = console.error;
+  console.error = () => {};
+  let response;
+  try { response = await analyze(bindings, 'doc-xhs-bad'); } finally { console.error = originalConsoleError; }
+  assert.equal(response.status, 502);
+  assert.equal(bindings.DB.sections.get('resources').content, '');
+  assert.equal(bindings.DB.documents.get('doc-xhs-bad').ai_status, 'failed');
 });
 
 test('an identical AI result creates no history, source, timestamp change, or undo step', async () => {
@@ -396,6 +442,9 @@ test('AI output enforces section keys, 1-12 non-empty items, deduplication, and 
   });
   assert.throws(() => parseProfileUpdates(response({
     updates: [{ section_key: 'unknown', items: ['内容'] }]
+  })), /未知或重复/);
+  assert.throws(() => parseProfileUpdates(response({
+    updates: [{ section_key: OTHER_PRODUCTS_SECTION_KEY, items: ['不得由普通资料写入'] }]
   })), /未知或重复/);
   assert.throws(() => parseProfileUpdates(response({
     updates: [{ section_key: 'resources', items: [] }]

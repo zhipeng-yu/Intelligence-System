@@ -1,4 +1,5 @@
 import {
+  MACHINE_XHS_SCOPE,
   isAdmin,
   isIngest,
   json,
@@ -78,9 +79,10 @@ export const onRequestPost = withPublic(async ({ request, env }) => {
         id, title, note, category, scope, ai_status, ai_error, analyzed_at,
         auto_analyzed, network_hash, uploaded_at, original_name, object_key,
         mime_type, size_bytes, deleted_at
-      ) VALUES (?1, ?2, ?3, NULL, NULL, 'not_started', NULL, NULL, 0, ?4, ?5, ?6, ?7, ?8, ?9, NULL)
+      ) VALUES (?1, ?2, ?3, NULL, ?4, 'not_started', NULL, NULL, 0, ?5, ?6, ?7, ?8, ?9, ?10, NULL)
     `).bind(
-      id, title, note, addressHash, uploadedAt, originalName, objectKey, mimeType, file.size
+      id, title, note, ingest ? MACHINE_XHS_SCOPE : null,
+      addressHash, uploadedAt, originalName, objectKey, mimeType, file.size
     ).run();
   } catch (error) {
     await env.BUCKET.delete(objectKey);
@@ -92,7 +94,7 @@ export const onRequestPost = withPublic(async ({ request, env }) => {
     title,
     note,
     category: null,
-    scope: null,
+    scope: ingest ? MACHINE_XHS_SCOPE : null,
     ai_status: 'not_started',
     ai_error: null,
     analyzed_at: null,

@@ -14,4 +14,4 @@ $trigger.EndBoundary = $EndBoundary.ToString('yyyy-MM-ddTHH:mm:ss')
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -MultipleInstances IgnoreNew `
   -ExecutionTimeLimit (New-TimeSpan -Hours 1) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings `
-  -Description '小红书公开课程产品 7 天最小试运行' -Force | Out-Null
+  -Description '小红书公开笔记 7 天最小试运行' -Force | Out-Null

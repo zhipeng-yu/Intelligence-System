@@ -258,11 +258,11 @@
           <div class="summary-copy">
             <span class="eyebrow">目标学校 / 01</span>
             <h2 id="overview-title">目标学校A</h2>
-            <p>八张卡片汇总学校当前信息。上传新资料后，系统会与现有画像合并，只更新资料明确包含的内容。</p>
+            <p>九张卡片汇总学校当前信息和其他产品资料。上传新资料后，系统会与现有画像合并，只更新资料明确包含的内容。</p>
           </div>
           <div class="completion">
             <span>画像完成度</span>
-            <strong id="completionText">学校信息已补全 0/8（0%）</strong>
+            <strong id="completionText">资料已补全 0/9（0%）</strong>
           </div>
         </div>
         <div class="profile-grid section" id="profileGrid" aria-live="polite"></div>
@@ -406,7 +406,7 @@
     function renderProfile() {
       if (!profile) return;
       document.querySelector('#completionText').textContent =
-        `学校信息已补全 ${profile.filled}/${profile.total}（${profile.percentage}%）`;
+        `资料已补全 ${profile.filled}/${profile.total}（${profile.percentage}%）`;
       profileGrid.replaceChildren(...profile.sections.map((section, index) => {
         const card = node('article', '', 'profile-card');
         card.append(node('span', String(index + 1).padStart(2, '0'), 'card-number'));

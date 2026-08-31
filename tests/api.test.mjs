@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { MACHINE_XHS_SCOPE } from '../functions/_shared.js';
 import { onRequestGet, onRequestPost } from '../functions/api/documents/index.js';
 import { onRequestDelete } from '../functions/api/documents/[id].js';
 import { onRequestGet as onRequestFile } from '../functions/api/documents/[id]/file.js';
@@ -56,9 +57,9 @@ class FakeDB {
       async run() {
         if (/INSERT INTO documents/.test(sql)) {
           if (database.failInsert) throw new Error('simulated D1 failure');
-          const [id, title, note, networkHash, uploadedAt, originalName, objectKey, mimeType, sizeBytes] = this.values;
+          const [id, title, note, scope, networkHash, uploadedAt, originalName, objectKey, mimeType, sizeBytes] = this.values;
           database.rows.set(id, {
-            id, title, note, category: null, scope: null, ai_status: 'not_started', ai_error: null,
+            id, title, note, category: null, scope, ai_status: 'not_started', ai_error: null,
             analyzed_at: null, auto_analyzed: 0, network_hash: networkHash, uploaded_at: uploadedAt,
             original_name: originalName, object_key: objectKey, mime_type: mimeType,
             size_bytes: sizeBytes, deleted_at: null, undone_at: null
@@ -268,6 +269,8 @@ test('INGEST_KEY only bypasses Turnstile while public upload still requires it',
     env: bindings
   });
   assert.equal(accepted.status, 201);
+  const machineDocument = (await accepted.json()).document;
+  assert.equal(machineDocument.scope, MACHINE_XHS_SCOPE);
   assert.equal(turnstileCalls, 0);
 
   const wrongKey = await onRequestPost({
@@ -283,6 +286,23 @@ test('INGEST_KEY only bypasses Turnstile while public upload still requires it',
   });
   assert.equal(publicUpload.status, 400);
   assert.equal(turnstileCalls, 1);
+});
+
+test('only a correct INGEST_KEY marks a document as Xiaohongshu material', async () => {
+  const bindings = env();
+  const publicUpload = await onRequestPost({
+    request: uploadRequest(pdf('public.pdf')),
+    env: bindings
+  });
+  assert.equal(publicUpload.status, 201);
+  assert.equal((await publicUpload.json()).document.scope, null);
+
+  const machineUpload = await onRequestPost({
+    request: uploadRequest(pdf('machine.pdf'), { ingestKey: INGEST_KEY, omitToken: true }),
+    env: bindings
+  });
+  assert.equal(machineUpload.status, 201);
+  assert.equal((await machineUpload.json()).document.scope, MACHINE_XHS_SCOPE);
 });
 
 test('server still rejects extension, MIME, signature, note and size violations', async () => {
