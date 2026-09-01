@@ -198,6 +198,9 @@ def collect_account(client, feed_action, user_action, account_id: str, job: dict
     for feed in feeds[:20]:
         if is_video(feed):
             continue
+        published_at = datetime.fromtimestamp(feed_timestamp(feed), CHINA_TZ)
+        if published_at < window_start or published_at > window_end:
+            continue
         note_id = str(feed.get("id", ""))
         token = text_value(feed.get("xsecToken"))
         if not re.fullmatch(r"[0-9a-f]{24}", note_id) or not token:

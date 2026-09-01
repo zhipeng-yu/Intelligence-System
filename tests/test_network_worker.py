@@ -10,6 +10,7 @@ from automation import network_worker
 from automation.network_worker import (
     CHINA_TZ,
     WorkerBlocked,
+    collect_account,
     detail_result,
     deterministic_summary,
     is_video,
@@ -83,6 +84,21 @@ class NetworkWorkerTest(unittest.TestCase):
         self.assertEqual(payload["status"], "partial")
         self.assertEqual(len(payload["results"]), 30)
         self.assertEqual(payload["failures"][0]["account_id"], "b" * 24)
+
+    def test_account_skips_details_outside_requested_window(self):
+        recent = int((self.now - timedelta(hours=1)).timestamp())
+        old = int((self.now - timedelta(days=8)).timestamp())
+        feeds = [
+            {"id": f"{recent:08x}" + "a" * 16, "xsecToken": "recent"},
+            {"id": f"{old:08x}" + "b" * 16, "xsecToken": "old"},
+        ]
+        detail = {"note": {"type": "normal", "title": "阅读课程", "desc": "公开说明", "time": recent}}
+        with patch.object(network_worker, "profile_feeds", return_value=("公开账号", feeds)), \
+             patch.object(network_worker, "safe_feed_detail", return_value=detail) as read_detail:
+            results = collect_account(object(), lambda _client: object(), object(), "a" * 24, self.job)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(read_detail.call_count, 1)
+        self.assertEqual(read_detail.call_args.args[3], "recent")
 
     def test_security_block_stops_later_accounts(self):
         calls = []
