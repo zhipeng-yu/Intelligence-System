@@ -111,6 +111,7 @@ class NetworkWorkerTest(unittest.TestCase):
         schedule = Path("automation/register_network_worker.ps1").read_text(encoding="utf-8")
         self.assertIn("New-TimeSpan -Minutes 1", schedule)
         self.assertIn("MultipleInstances IgnoreNew", schedule)
+        self.assertIn("-m automation.network_worker run", schedule)
 
     def test_summary_never_needs_ai_or_full_copy(self):
         summary = deterministic_summary("账号", "阅读课程", "共 8 节课，面向三年级。" * 30,

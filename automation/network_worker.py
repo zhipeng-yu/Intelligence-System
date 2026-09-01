@@ -329,8 +329,7 @@ def schedule(repo: Path) -> None:
     executable = pythonw if pythonw.is_file() else Path(sys.executable)
     result = subprocess.run(
         ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(REGISTER_SCRIPT),
-         "-Python", str(executable), "-Runner", str(Path(__file__).resolve()),
-         "-WorkingDirectory", str(repo.resolve()), "-TaskName", TASK_NAME],
+         "-Python", str(executable), "-WorkingDirectory", str(repo.resolve()), "-TaskName", TASK_NAME],
         check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
     if result.returncode:
