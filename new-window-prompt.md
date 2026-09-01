@@ -1,31 +1,11 @@
-# 小红书公开笔记 7 天最小试运行交接提示词
+# 小规模多用户网络资料 MVP 上线交接提示词
 
-请接手 `D:\Project\ledu_project\Intelligence System` 的“小红书公开笔记 7 天最小试运行”，全程使用 `ponytail` full 和固定提交 `afa96802d3e61cdd5e7bd7b37ec59182bbe07d37` 对应的已安装 `xiaohongshu-skill`。设计已经确认，不要扩展或重新访谈。
+请接手 `D:\Project\ledu_project\Intelligence System`，使用 ponytail full，不扩展已完成的“小规模多用户网络资料 MVP”。
 
-## 开始前
+开始前完整阅读 `AGENTS.md`、`readme.md`、`handoff.md`、`school-profile-handoff.md`、相关代码和测试，以及固定提交 `afa96802d3e61cdd5e7bd7b37ec59182bbe07d37` 对应的已安装 `xiaohongshu-skill` 全部必读指令。确认位于 `main`，fetch 后只读比较 `origin/main`；禁止 pull、强推和未知非快进。
 
-1. 完整阅读 `AGENTS.md`、`readme.md`、`handoff.md`、`school-profile-handoff.md`、本文件、上传/分析代码，以及技能的 `SKILL.md`、`AGENTS.md`、`docs/INSTALL.md`、`docs/SECURITY.md`、`docs/API.md` 和相关代码。
-2. 确认 `main` 和工作区状态；fetch 后只读核对 `origin/main`。认证失败、冲突或未知远端变化立即停止，只允许正常快进推送。
-3. 不读取、输出或记录现有密钥、管理链接、Cookie、分享查询参数或原文件内容。
+仓库代码已经完成，但生产仍是 Pages 源码 `538f8c6` 和远端 D1 `0004`。不要把代码已推送误认为已授权生产迁移、Secret、部署、真实 Edge 检索或旧任务停用。
 
-## 当前状态
+下一步只在用户逐项明确授权后执行 `handoff.md` 的最小上线动作：安全配置 `PHONE_PEPPER` 与 `NETWORK_WORKER_KEY`、一次性引导首位白名单用户、应用远端 `0005`、部署、真实登录与系统 Edge 检索验收，最后才停用旧七日任务。停用必须保留旧 `seen.json`、运行状态和 `held_candidates`。
 
-- 固定账号 `565aa55cb8ce1a32c6fdebe7` 已在本机系统 Edge 完成登录、身份核验和最新 20 条 ID 基线。
-- 基线没有生产上传或 AI 调用；本地状态、Edge profile、Conda Python 3.12 环境和 DPAPI 凭据均在 `%LOCALAPPDATA%\LeduSchoolArchive\xhs-course-trial`，不得进入 Git。
-- 生产 `INGEST_KEY` 已配置，生产 D1 已应用 `0004`，Pages 已部署源码提交 `538f8c6`；一次历史演示已完成并使用 1/7 次 AI。1 条旧课程规则产生的历史候选仍保留在 `held_candidates` 且不进入自动队列；任务下一次 9 月 1 日 09:00，仍于 9 月 4 日结束，实时状态以本地状态文件和 `handoff.md` 为准。
-
-## 固定运行边界
-
-- 只使用本机系统 Edge；不使用 Chrome、不下载 Playwright Chromium，不注入 stealth、指纹伪装、User-Agent 或验证码绕过。验证码、登录失效、安全验证和账号身份异常立即通知并停止，允许人工在 Edge 接管。
-- 仅监控上述标准主页 ID；不保存 `xsec_token`、`share_id` 等临时参数。记录基线后的全部新增笔记，不按课程产品过滤，不回溯基线历史或旧编辑。
-- 每条只保存原文标题、发布时间、固定来源账号、无临时参数的公开链接和 100–200 字确定性事实摘要；不保存全文、图片、视频、评论或用户信息，不调用第二个 AI。
-- 配置完成次日 09:00（Asia/Shanghai）开始，连续 7 个自然日。每日最多一个 PDF、10 条、一次现有生产 AI；溢出顺延。无新增笔记则不上传、不调用 AI。
-- 首次只记录 20 条 ID；之后只处理新增，不回查旧编辑。临时网络错误 15 分钟后仅重试一次；登录、身份、上传或 AI 异常立即通知并停止后续任务，失败不延长周期。
-
-## 网站与发布边界
-
-- 机器上传只使用现有 `POST /api/documents` 的独立 `INGEST_KEY`，仅绕过 Turnstile；网络散列限流、PDF/DOCX/XLSX、50MB、扩展名/MIME/文件头校验保持，不得使用 `ADMIN_KEY`。
-- 上传后继续调用现有 `/api/documents/{id}/analyze`。正确 `INGEST_KEY` 上传固定标记为“其他产品资料”，工具 schema 与返回解析都只能更新第九卡；普通上传只能更新原八张学校画像。第九卡保留最新 12 条，全部记录保存在每日 PDF。
-- 仅新增 `0004_add_other_products_section.sql` 无损扩展 `profile_sections` key 约束，不增加表、队列、框架、依赖、服务、上传端点、快照、来源表、重做或分支。
-- 本任务的最小代码修改、生产 `0004`、Pages 部署和一次历史演示 AI 已完成；试运行最多 7 次真实生产 AI 的授权与本地配额仍有效，当前已用 1 次。未授权生产硬删除或规避平台验证。
-- 每次生产动作前重新 fetch 并核对远端。完成后更新交接文件，只暂存本次文件，验证后正常提交、再次核对并快进推送；禁止强推。
+不读取、输出、截图或记录任何现有密钥、完整手机号、Cookie、管理链接、Edge 会话文件或原始凭证。只用系统 Edge；禁止 Chrome、下载版 Chromium、stealth、指纹伪装或验证码绕过。生产出现验证码、登录失效或安全验证时必须停止并等待人工处理。

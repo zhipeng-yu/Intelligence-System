@@ -1,71 +1,67 @@
-# 学校画像系统 2.0
+# 乐读内部资料库
 
-面向公司内部培训老师的单校资料整理工具。老师无需注册即可查看八张学校画像卡片、一张“其他产品资料”卡片并上传资料；系统把 PDF、DOCX、XLSX 转成文本后交给 Doubao-Seed-2.0-lite，将新资料与当前画像合并，只更新资料明确涉及且实际变化的卡片。
+面向少量内部用户的单校资料与小红书公开资料工具。源码保持一个原生 `index.html`、Cloudflare Pages Functions、D1 和既有私有 R2；没有前端框架、第三方队列、新服务或新增 AI。
 
 生产地址：<https://ledu-school-archive.pages.dev>
 
-生产环境已应用到 `0004_add_other_products_section.sql`，并于 2026-08-31 部署源码提交 `538f8c6`，当前运行碎片累积、线性撤销、符合顺序的彻底删除、九张卡片和最小权限机器上传。生产已用无敏感信息的合成资料完成真实 Workers AI、方舟 Responses API、单步撤销及 R2/D1 硬删除闭环验收。
+当前仓库已实现“小规模多用户网络资料 MVP”，但生产仍是旧版：Pages 源码提交 `538f8c6`，远端 D1 只应用到 `0004_add_other_products_section.sql`。本轮没有执行生产迁移、Secret 配置、部署、真实 Edge 检索、真实 AI 调用或远端数据删除。
 
-## 小红书公开笔记 7 天试运行
+## 登录与权限
 
-仓库包含一个本地试运行器 `automation/xhs_course_trial.py`：它复用锁定提交的 `xiaohongshu-skill`，但只启动本机系统 Edge，不下载 Chromium，不注入 stealth、指纹伪装或验证码绕过。它只监控固定公开主页 ID `565aa55cb8ce1a32c6fdebe7`，不持久化 `xsec_token`、分享参数、全文、图片、视频、评论或用户信息。
+- 用户输入管理员预先加入白名单的中国大陆 11 位手机号，并通过 Turnstile 登录；没有密码、短信、自助注册或自助注销。
+- D1 只保存手机号 HMAC、末四位、备注和启用状态。会话令牌只以 SHA-256 保存，浏览器使用 12 小时 `Secure`、`HttpOnly`、`SameSite=Strict`、`Path=/` Cookie，不使用 localStorage。
+- 所有用户 API 从会话确定用户身份，不接受客户端 `user_id`。禁用用户立即清除其会话，但保留网络资料。
+- 白名单管理同时要求有效用户会话和现有 `ADMIN_KEY`；原下载、重试、撤销和彻底删除管理操作也保持双重要求。
 
-首次系统 Edge 登录、账号身份核验和最新 20 条 ID 基线已完成。运行器只把主页顶部到第一个已见 ID 之间的笔记视为新增，并记录全部新增笔记，不再按课程产品过滤；每条只保留原文标题、发布时间、固定来源账号、无临时参数的公开链接和 100–200 字确定性摘要。历史候选保留在 `held_candidates`，不会进入自动队列。任务仍按原周期运行至 2026-09-04，不补跑或延长失败日；运行状态、Edge profile、Conda 环境和 DPAPI 凭据位于 `%LOCALAPPDATA%\LeduSchoolArchive\xhs-course-trial`，不进入 Git。
+这是内部小规模弱认证：知道某个白名单手机号的人可以冒用该身份，产品已接受此边界。
 
-每天最多把 10 条新增笔记合并为一个 PDF 并调用一次现有生产 AI；溢出顺延，没有新增则不上传、不调用 AI。正确 `INGEST_KEY` 上传会被标记为“其他产品资料”，分析工具和服务端返回校验都只允许更新第九卡，不能污染原八张学校画像；第九卡只展示合并后的最新 12 条，全部记录仍保留在每日 PDF 中。
+## 学校资料
 
-生产已用系统 Edge 核验并演示上传最新一条公开笔记；文档分析完成且只更新“其他产品资料”，原八张学校画像前后校验一致。该演示计入试运行配额，当前已使用 1/7 次真实生产 AI，旧历史候选仍保留且不进入自动队列。
+- 登录后共享原有八张学校画像卡片。
+- 原第九张“其他产品资料”、历史演示、原文件和数据库记录原样保留，但不出现在学校画像、资料列表或可撤销范围中。
+- 普通上传仍支持 PDF、DOCX、XLSX，单文件最大 50MB；Turnstile、同一网络散列每小时 5 份、扩展名/MIME/文件头校验和每文件一次自动整理均保留。
+- 学校资料继续使用 Workers AI `toMarkdown` 与方舟 Responses API；线性撤销、私有 R2、随机对象键、强制附件下载和彻底删除规则没有放宽。
+- `INGEST_KEY` 仍只能在现有 `POST /api/documents` 绕过 Turnstile，不能获得管理权限。
 
-## 产品边界
+## 网络资料
 
-- 首页只有学校信息概览、极简上传、最近更新三个区域。
-- 卡片固定为学校概况、校历与作息、年级与班级概况、教材与当前教学进度、考试安排与范围、教学重点难点与常见失分、近期活动与通知、可用教学资源、其他产品资料九张。
-- 完成度只计算有内容的卡片数，例如“已补全 5/9（56%）”；文件数不计分。
-- 上传表单只有文件、可选备注和上传按钮。支持 PDF、DOCX、XLSX，单文件最大 50MB。
-- 普通老师可查看画像、卡片级参考资料和上传资料；管理链接另可下载原文件、重试失败的 AI 整理、撤销最近一次有效画像更新，并彻底删除失败、未生效或已撤销资料。
-- 不包含 36 字段、权重、候选、确认状态、双确认、账号体系、多校、知识图谱、向量库或任务队列。
+- 每人最多保存 3 个 24 位十六进制小红书账号 ID；不接受昵称或链接。
+- 每次输入 1～2 个关键词并选择近 1、3 或 7 日。标题与公开文案规范化后必须同时包含全部关键词。
+- 一个全局串行工作器按账号读取主页，每账号最多检查最近 20 条图文；主页和详情阶段都排除视频，不下载媒体。
+- 每次最多保存 30 条，按发布时间倒序展示账号名、发布日期、标题、干净公开链接和 100～200 字确定性摘要。
+- 不保存完整文案、媒体、评论、用户资料或临时 token，也不调用 AI。
+- 每人每天最多 3 次，全站每天最多 20 次，每人最多一个活动任务；日期按 Asia/Shanghai 计算，检索窗口固定在任务创建时刻。
+- 保留每人最近 10 个已结束任务。用户只能查看和删除自己的账号、任务及结果；删除任务级联删除结果。
+- 单账号失败标记 `partial` 并保留其他结果。验证码、登录失效或安全验证会标记 `blocked`、停止后续认领并等待人工显式恢复。
 
-## 数据流
+## 本机工作器
 
-```text
-文件 -> 私有 R2
-     -> Workers AI toMarkdown
-     -> 火山方舟 Responses API
-     -> 白名单校验
-     -> D1 九张卡片
-```
+`automation/network_worker.py` 复用既有 Conda 环境和锁定提交 `afa96802d3e61cdd5e7bd7b37ec59182bbe07d37` 对应的 `xiaohongshu-skill`，只启动 Windows 系统 Edge；不使用 Chrome、下载版 Chromium、stealth、指纹伪装或验证码绕过。
 
-AI 为受影响卡片返回完整新版短条目：保留不冲突旧项，以新资料替换冲突项、删除过时项并去重；未提到的卡片保持原值。每卡最多 12 条、总长不超过 4000 字；完全相同的结果不写历史或来源。失败时保留原文件，只有管理员可以重试。公开上传使用 Turnstile，并按不可逆网络散列限制为每小时 5 份；不保存明文 IP。
+工作器使用独立 `NETWORK_WORKER_KEY`。任务计划程序每分钟启动一次，每次只认领一个任务，并使用 `MultipleInstances IgnoreNew`。认领采用 30 分钟租约和一次性 claim token，过期可重新认领，相同回传幂等。
 
-一次实际资料更新无论影响多少卡片都只形成一个撤销步骤。管理员只能从最新一步连续向前撤销，没有重做、分支或任意版本恢复；卡片内容、更新时间和来源会一起回退。有效栈中的资料不能直接删除，失败、未生效或已撤销资料可彻底删除 R2 对象和 D1 文件身份，匿名画像历史永久保留。
+旧七日任务尚未停用。只有新功能完成真实生产验收后才停用；停用时保留旧 `seen.json`、运行状态和 `held_candidates`。
 
-请勿上传学生名单、手机号、个人成绩明细、身份证信息或公司保密资料。任何密钥、管理链接和本地环境文件都不得进入 Git、聊天或普通文档。
+## 数据与接口
 
-## 本地验证
+`0005_add_network_materials.sql` 只新增 `users`、`sessions`、`watched_accounts`、`network_search_jobs`、`network_search_results`。任务状态固定为 `queued`、`running`、`completed`、`partial`、`blocked`、`failed`。
+
+新增接口仅包括认证、管理员白名单、关注账号、检索任务以及工作器认领/回传，代码位于 `functions/api/auth/`、`functions/api/admin/` 和 `functions/api/network/`。
+
+本地运行需在 Git 忽略的环境中提供 `ADMIN_KEY`、`INGEST_KEY`、`ARK_API_KEY`、`PHONE_PEPPER`、`NETWORK_WORKER_KEY`、`TURNSTILE_SECRET` 和公开的 `TURNSTILE_SITE_KEY`；不得记录这些值。
+
+## 验证
 
 ```powershell
-npx.cmd wrangler d1 migrations apply ledu-school-archive --local --persist-to .wrangler/state
 node --test tests/api.test.mjs
 node --test tests/profile.test.mjs
+node --test tests/network.test.mjs
 %LOCALAPPDATA%\LeduSchoolArchive\xhs-course-trial\conda-env\python.exe -m unittest tests/test_xhs_course_trial.py
+%LOCALAPPDATA%\LeduSchoolArchive\xhs-course-trial\conda-env\python.exe -m unittest tests/test_network_worker.py
+npx.cmd wrangler d1 migrations apply ledu-school-archive --local --persist-to .wrangler/state
 npx.cmd wrangler pages functions build
-npx.cmd wrangler pages dev . --persist-to .wrangler/state
 ```
 
-本地运行需要在被 Git 忽略的环境中提供 `ADMIN_KEY`、`INGEST_KEY`、`ARK_API_KEY`、`TURNSTILE_SECRET` 和公开的 `TURNSTILE_SITE_KEY`；Workers AI 通过 `wrangler.toml` 的 `AI` binding 提供。测试使用模拟响应，不会调用真实方舟。
-
-## 主要文件
-
-- `index.html`：单页原生前端
-- `functions/_shared.js`：固定卡片、上传校验、鉴权、Turnstile 与限流辅助
-- `functions/api/documents/`：上传、列表、私有下载、彻底删除与 AI 整理
-- `functions/api/profile/`：九卡片读取、有效来源与全局线性撤销
-- `migrations/0002_create_profile_values.sql`：2.0 文档状态、原八卡片与历史表
-- `migrations/0003_add_linear_undo.sql`：复用历史表补充线性撤销身份与恢复时间
-- `migrations/0004_add_other_products_section.sql`：无损扩展卡片约束并增加“其他产品资料”
-- `tests/api.test.mjs`、`tests/profile.test.mjs`：服务端闭环测试
-- `automation/xhs_course_trial.py`：系统 Edge 单账号 7 天试运行器
-- `school-profile-handoff.md`：2.0 技术交接与发布边界
-- `artifacts/school-archive-desktop.png`：桌面端验收截图
+测试使用模拟响应，不访问真实小红书或调用真实 AI。桌面系统 Edge、390px、键盘焦点、主流程和控制台错误已验收，截图见 `artifacts/school-archive-desktop.png`。
 
 代码仓库：<https://github.com/zhipeng-yu/Intelligence-System>

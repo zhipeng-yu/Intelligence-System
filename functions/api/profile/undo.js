@@ -1,23 +1,24 @@
-import { json, withAuth } from '../../_shared.js';
+import { OTHER_PRODUCTS_SECTION_KEY, json, withAdminUser } from '../../_shared.js';
 
-export const onRequestPost = withAuth(async ({ env }) => {
+export const onRequestPost = withAdminUser(async ({ env }) => {
   const document = await env.DB.prepare(`
     SELECT document.id
     FROM documents AS document
     JOIN profile_history AS history ON history.change_document_id = document.id
     WHERE document.deleted_at IS NULL AND document.undone_at IS NULL
+      AND history.section_key <> ?1
     GROUP BY document.id
     ORDER BY MAX(history.changed_at) DESC, document.uploaded_at DESC, document.id DESC
     LIMIT 1
-  `).first();
+  `).bind(OTHER_PRODUCTS_SECTION_KEY).first();
   if (!document) return json({ error: '没有可撤销的画像更新。' }, 409);
 
   const { results } = await env.DB.prepare(`
     SELECT section_key, content, source_document_id, previous_updated_at
     FROM profile_history
-    WHERE change_document_id = ?1
+    WHERE change_document_id = ?1 AND section_key <> ?2
     ORDER BY section_key
-  `).bind(document.id).all();
+  `).bind(document.id, OTHER_PRODUCTS_SECTION_KEY).all();
   if (!results?.length) return json({ error: '没有可撤销的画像更新。' }, 409);
 
   const undoneAt = new Date().toISOString();
@@ -48,4 +49,4 @@ export const onRequestPost = withAuth(async ({ env }) => {
     undone_at: undoneAt,
     restored_sections: results.map(history => history.section_key)
   });
-});
+}, true);

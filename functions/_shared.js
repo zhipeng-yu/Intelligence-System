@@ -1,5 +1,8 @@
 const encoder = new TextEncoder();
 
+export const SESSION_COOKIE = 'ledu_session';
+export const SESSION_TTL_SECONDS = 12 * 60 * 60;
+
 export const CATEGORIES = ['学校信息', '教学进度', '试卷资料', '家长与情报', '活动与产品'];
 export const MAX_FILE_SIZE = 50 * 1024 * 1024;
 export const MAX_SECTION_CONTENT = 4000;
@@ -47,7 +50,12 @@ export function json(data, status = 200, headers = {}) {
   });
 }
 
-async function sameSecret(left, right) {
+export async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(value));
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export async function sameSecret(left, right) {
   const [leftHash, rightHash] = await Promise.all([
     crypto.subtle.digest('SHA-256', encoder.encode(left)),
     crypto.subtle.digest('SHA-256', encoder.encode(right))
@@ -72,8 +80,89 @@ export async function isIngest(request, env) {
   return sameSecret(request.headers.get('X-Ingest-Key') || '', env.INGEST_KEY);
 }
 
+export async function isWorker(request, env) {
+  if (typeof env.NETWORK_WORKER_KEY !== 'string' || encoder.encode(env.NETWORK_WORKER_KEY).byteLength < 32) {
+    return false;
+  }
+  return sameSecret(request.headers.get('X-Network-Worker-Key') || '', env.NETWORK_WORKER_KEY);
+}
+
+export function normalizePhone(value) {
+  if (typeof value !== 'string') return '';
+  const phone = value.trim();
+  return /^1[3-9][0-9]{9}$/.test(phone) ? phone : '';
+}
+
+export async function phoneHmac(phone, pepper) {
+  if (!phone || typeof pepper !== 'string' || encoder.encode(pepper).byteLength < 32) return '';
+  const key = await crypto.subtle.importKey(
+    'raw', encoder.encode(pepper), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(phone));
+  return [...new Uint8Array(signature)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+export function randomToken(bytes = 32) {
+  const value = new Uint8Array(bytes);
+  crypto.getRandomValues(value);
+  let binary = '';
+  for (const byte of value) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+function cookieValue(request, name) {
+  const source = request.headers.get('Cookie') || '';
+  for (const part of source.split(';')) {
+    const separator = part.indexOf('=');
+    if (separator < 0 || part.slice(0, separator).trim() !== name) continue;
+    return part.slice(separator + 1).trim();
+  }
+  return '';
+}
+
+export function sessionToken(request) {
+  return cookieValue(request, SESSION_COOKIE);
+}
+
+export function sessionCookie(token, maxAge = SESSION_TTL_SECONDS) {
+  return `${SESSION_COOKIE}=${token}; Max-Age=${maxAge}; Path=/; Secure; HttpOnly; SameSite=Strict`;
+}
+
+export function clearSessionCookie() {
+  return sessionCookie('', 0);
+}
+
+export async function getUserSession(request, env, now = new Date()) {
+  const token = sessionToken(request);
+  if (!token || token.length > 100) return null;
+  const tokenHash = await sha256Hex(token);
+  return env.DB.prepare(`
+    SELECT user.id, user.phone_last4, user.note, session.expires_at
+    FROM sessions AS session
+    JOIN users AS user ON user.id = session.user_id
+    WHERE session.token_hash = ?1 AND session.expires_at > ?2 AND user.enabled = 1
+  `).bind(tokenHash, now.toISOString()).first();
+}
+
 function storageError(env) {
   return !env.DB || !env.BUCKET ? json({ error: '服务存储尚未配置完成。' }, 503) : null;
+}
+
+function databaseError(env) {
+  return !env.DB ? json({ error: '服务数据库尚未配置完成。' }, 503) : null;
+}
+
+export function withDatabase(handler) {
+  return async context => {
+    const error = databaseError(context.env);
+    if (error) return error;
+    try {
+      return await handler(context);
+    } catch (caught) {
+      console.error(caught);
+      return json({ error: '服务暂时不可用，请稍后重试。' }, 500);
+    }
+  };
 }
 
 export function withPublic(handler) {
@@ -99,6 +188,27 @@ export function withAuth(handler) {
     }
     return handler(context);
   });
+}
+
+export function withUser(handler, requireStorage = false) {
+  const wrapper = requireStorage ? withPublic : withDatabase;
+  return wrapper(async context => {
+    const user = await getUserSession(context.request, context.env);
+    if (!user) return json({ error: '请先登录。' }, 401, { 'Set-Cookie': clearSessionCookie() });
+    return handler({ ...context, user });
+  });
+}
+
+export function withAdminUser(handler, requireStorage = false) {
+  return withUser(async context => {
+    if (typeof context.env.ADMIN_KEY !== 'string' || encoder.encode(context.env.ADMIN_KEY).byteLength < 32) {
+      return json({ error: '服务尚未配置管理密钥。' }, 503);
+    }
+    if (!await isAdmin(context.request, context.env)) {
+      return json({ error: '管理密钥无效，请使用最新管理链接访问。' }, 401);
+    }
+    return handler(context);
+  }, requireStorage);
 }
 
 function textField(form, name, maxLength) {

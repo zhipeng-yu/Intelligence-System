@@ -36,10 +36,10 @@
       font: 14px/1.6 var(--body);
     }
 
-    button, input, textarea { font: inherit; }
+    button, input, textarea, select { font: inherit; }
     button { color: inherit; }
     a:focus-visible, button:focus-visible, input:focus-visible,
-    textarea:focus-visible, summary:focus-visible {
+    textarea:focus-visible, select:focus-visible, summary:focus-visible {
       outline: 3px solid var(--yellow);
       outline-offset: 3px;
     }
@@ -75,17 +75,32 @@
     .brand span { color: rgba(255, 255, 255, .54); font-size: 10px; letter-spacing: .14em; }
     .side-label { margin: 0 0 12px 12px; color: rgba(255, 255, 255, .42); font-size: 10px; letter-spacing: .18em; }
     .side-nav { display: grid; gap: 5px; }
-    .side-nav a {
+    .side-nav button {
+      width: 100%;
       padding: 11px 13px;
       color: rgba(255, 255, 255, .72);
-      text-decoration: none;
+      text-align: left;
+      background: transparent;
+      border: 0;
       border-left: 2px solid transparent;
+      cursor: pointer;
     }
-    .side-nav a:hover, .side-nav a.active { color: #fff; background: rgba(255, 255, 255, .07); border-left-color: var(--yellow); }
+    .side-nav button:hover, .side-nav button.active { color: #fff; background: rgba(255, 255, 255, .07); border-left-color: var(--yellow); }
     .side-note { margin-top: 50px; padding: 17px 15px; border: 1px solid rgba(255, 255, 255, .13); }
     .side-note span { color: var(--yellow); font-size: 11px; letter-spacing: .12em; }
     .side-note p { margin: 9px 0 0; color: rgba(255, 255, 255, .7); font: 15px/1.7 var(--display); }
     .mobile-context { display: none; }
+    [hidden] { display: none !important; }
+
+    .login-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+    .login-card { width: min(440px, 100%); padding: 30px; border-top: 5px solid var(--red); }
+    .login-card h1 { margin-bottom: 10px; }
+    .login-card p { color: var(--ink-soft); }
+    .login-card input, .compact-form input, .compact-form select {
+      width: 100%; min-height: 42px; padding: 8px 10px; color: var(--ink);
+      background: var(--white); border: 1px solid var(--ink);
+    }
+    .login-actions { display: grid; gap: 14px; margin-top: 18px; }
 
     main { min-width: 0; padding: 32px clamp(22px, 4vw, 62px) 54px; }
     .topbar, .section-heading, .summary, .update-row, .footer {
@@ -101,6 +116,7 @@
     h2 { margin-bottom: 0; font: 800 clamp(22px, 2.4vw, 30px)/1.2 var(--display); }
     h3 { margin-bottom: 0; font: 700 18px/1.35 var(--display); }
     .mode-badge { padding: 9px 12px; color: var(--white); background: var(--red); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
+    .top-actions { display: flex; align-items: center; gap: 9px; }
 
     .summary {
       align-items: stretch;
@@ -181,6 +197,21 @@
     .notice.error { color: var(--red-dark); }
     .notice.success { color: var(--green); }
 
+    .split-grid { display: grid; grid-template-columns: minmax(260px, .8fr) minmax(0, 1.2fr); gap: 14px; }
+    .compact-form { display: grid; gap: 11px; }
+    .compact-form.two-column { grid-template-columns: 1fr 1fr; }
+    .compact-form .wide { grid-column: 1 / -1; }
+    .item-list { display: grid; gap: 8px; margin-top: 15px; }
+    .item-row { padding: 12px; background: var(--white); border: 1px solid var(--line); }
+    .item-row-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .item-row strong { overflow-wrap: anywhere; }
+    .search-results { display: grid; gap: 8px; margin-top: 12px; }
+    .result-card { padding: 13px; background: var(--paper); border-left: 3px solid var(--red); }
+    .result-card a { color: var(--red-dark); font-weight: 700; overflow-wrap: anywhere; }
+    .result-card p { margin: 7px 0 0; }
+    .result-meta { color: var(--ink-soft); font-size: 10px; }
+    .failure-list { margin: 10px 0 0; color: var(--red-dark); }
+
     .updates { display: grid; gap: 9px; }
     .update-row { align-items: flex-start; padding: 16px 18px; background: rgba(255, 253, 248, .9); border: 1px solid var(--line); }
     .update-copy { min-width: 0; }
@@ -199,8 +230,8 @@
       .sidebar { padding: 25px 12px; }
       .brand { justify-content: center; }
       .brand div:last-child, .side-label, .side-nav span, .side-note { display: none; }
-      .side-nav a { padding: 11px 6px; text-align: center; }
-      .side-nav a::before { content: attr(data-short); font: 700 14px/1 var(--display); }
+      .side-nav button { padding: 11px 6px; text-align: center; }
+      .side-nav button::before { content: attr(data-short); font: 700 14px/1 var(--display); }
     }
 
     @media (max-width: 680px) {
@@ -208,13 +239,16 @@
       .sidebar { position: static; height: auto; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-right: 0; border-bottom: 4px solid var(--red); }
       .brand { margin: 0; }
       .brand-mark { width: 35px; height: 35px; }
-      .side-nav, .side-label, .side-note { display: none; }
-      .mobile-context { display: block; color: rgba(255, 255, 255, .7); font-size: 11px; }
+      .side-label, .side-note, .mobile-context { display: none; }
+      .side-nav { display: flex; gap: 5px; margin-left: auto; }
+      .side-nav button { padding: 8px 10px; }
+      .side-nav button::before { content: none; }
+      .side-nav span { display: inline; }
       main { padding: 23px 15px 42px; }
       .topbar, .section-heading, .summary, .update-row, .footer { align-items: flex-start; }
       .summary, .update-row, .footer { flex-direction: column; }
       .completion { width: 100%; }
-      .profile-grid, .upload-form { grid-template-columns: 1fr; }
+      .profile-grid, .upload-form, .split-grid, .compact-form.two-column { grid-template-columns: 1fr; }
       .upload-submit { grid-template-columns: 1fr; }
       .primary-button { width: 100%; }
     }
@@ -231,17 +265,35 @@
   </style>
 </head>
 <body>
-  <div class="app-shell">
+  <section class="login-screen" id="loginScreen" aria-labelledby="loginTitle">
+    <div class="panel login-card">
+      <span class="eyebrow">LEDU · INTERNAL</span>
+      <h1 id="loginTitle">内部资料库</h1>
+      <p>请输入管理员预先加入白名单的中国大陆手机号。</p>
+      <form id="loginForm">
+        <div class="form-field">
+          <label for="phoneInput">手机号</label>
+          <input id="phoneInput" name="phone" type="tel" inputmode="numeric" autocomplete="tel" pattern="1[3-9][0-9]{9}" maxlength="11" required>
+        </div>
+        <div class="login-actions">
+          <div class="turnstile-slot" id="loginTurnstile"></div>
+          <button class="primary-button" id="loginButton" type="submit" disabled>登录</button>
+        </div>
+      </form>
+      <p class="notice" id="loginMessage" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <div class="app-shell" id="appShell" hidden>
     <aside class="sidebar" aria-label="主导航">
       <div class="brand">
         <div class="brand-mark">乐</div>
         <div><strong>学校画像</strong><span>School Profile</span></div>
       </div>
-      <p class="side-label">快速前往</p>
+      <p class="side-label">一级板块</p>
       <nav class="side-nav">
-        <a class="active" href="#overview" data-short="像"><span>学校信息概览</span></a>
-        <a href="#upload" data-short="传"><span>上传资料</span></a>
-        <a href="#updates" data-short="新"><span>最近更新</span></a>
+        <button class="active" id="schoolNav" type="button" data-view="school" data-short="校"><span>学校资料</span></button>
+        <button id="networkNav" type="button" data-view="network" data-short="网"><span>网络资料</span></button>
       </nav>
       <div class="side-note"><span>学校画像 2.0</span><p>上传一次，<br>信息自动整理。</p></div>
       <span class="mobile-context">目标学校A · 学校画像</span>
@@ -249,20 +301,21 @@
 
     <main>
       <header class="topbar">
-        <div><span class="eyebrow">SCHOOL PROFILE · 2.0</span><h1>学校画像系统</h1></div>
-        <span class="mode-badge" id="modeBadge">老师查看</span>
+        <div><span class="eyebrow">LEDU · INTERNAL MATERIALS</span><h1 id="pageTitle">学校资料</h1></div>
+        <div class="top-actions"><span class="mode-badge" id="modeBadge">用户</span><button class="action-button" id="logoutButton" type="button">退出</button></div>
       </header>
 
+      <div id="schoolView">
       <section id="overview" aria-labelledby="overview-title">
         <div class="summary">
           <div class="summary-copy">
             <span class="eyebrow">目标学校 / 01</span>
             <h2 id="overview-title">目标学校A</h2>
-            <p>九张卡片汇总学校当前信息和其他产品资料。上传新资料后，系统会与现有画像合并，只更新资料明确包含的内容。</p>
+            <p>八张卡片汇总学校当前信息。上传新资料后，系统会与现有画像合并，只更新资料明确包含的内容。</p>
           </div>
           <div class="completion">
             <span>画像完成度</span>
-            <strong id="completionText">资料已补全 0/9（0%）</strong>
+            <strong id="completionText">资料已补全 0/8（0%）</strong>
           </div>
         </div>
         <div class="profile-grid section" id="profileGrid" aria-live="polite"></div>
@@ -312,9 +365,58 @@
         <p class="notice" id="actionMessage" role="status" aria-live="polite"></p>
       </section>
 
+      <section class="section" id="adminUsers" aria-labelledby="admin-users-title" hidden>
+        <div class="section-heading"><div><span class="eyebrow">ADMIN</span><h2 id="admin-users-title">手机号白名单</h2></div><p>数据库只保存 HMAC 与末四位</p></div>
+        <div class="panel">
+          <form class="compact-form two-column" id="adminUserForm">
+            <div class="form-field"><label for="adminPhoneInput">手机号</label><input id="adminPhoneInput" type="tel" inputmode="numeric" pattern="1[3-9][0-9]{9}" maxlength="11" required></div>
+            <div class="form-field"><label for="adminNoteInput">备注</label><input id="adminNoteInput" maxlength="100"></div>
+            <button class="primary-button wide" type="submit">添加白名单用户</button>
+          </form>
+          <div class="item-list" id="adminUserList"></div>
+          <p class="notice" id="adminMessage" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+      </div>
+
+      <div id="networkView" hidden>
+        <section aria-labelledby="network-title">
+          <div class="summary">
+            <div class="summary-copy"><span class="eyebrow">NETWORK MATERIALS</span><h2 id="network-title">网络资料</h2><p>只读取你关注账号的公开图文；关键词采用 AND 匹配，不保存完整文案或媒体。</p></div>
+            <div class="completion"><span>检索范围</span><strong>近 1 / 3 / 7 日</strong></div>
+          </div>
+        </section>
+        <div class="split-grid section">
+          <section class="panel" aria-labelledby="accounts-title">
+            <h2 id="accounts-title">我的账号</h2>
+            <p class="notice">最多 3 个，仅接受 24 位标准账号 ID。</p>
+            <form class="compact-form" id="accountForm">
+              <div class="form-field"><label for="accountIdInput">小红书账号 ID</label><input id="accountIdInput" maxlength="24" pattern="[0-9a-fA-F]{24}" required></div>
+              <button class="primary-button" type="submit">添加账号</button>
+            </form>
+            <div class="item-list" id="accountList"></div>
+            <p class="notice" id="accountMessage" role="status" aria-live="polite"></p>
+          </section>
+          <section class="panel" aria-labelledby="search-title">
+            <h2 id="search-title">新建检索</h2>
+            <form class="compact-form two-column" id="searchForm">
+              <div class="form-field"><label for="keywordOne">关键词 1</label><input id="keywordOne" maxlength="40" required></div>
+              <div class="form-field"><label for="keywordTwo">关键词 2（可选）</label><input id="keywordTwo" maxlength="40"></div>
+              <div class="form-field wide"><label for="searchDays">时间范围</label><select id="searchDays"><option value="7" selected>近 7 日</option><option value="3">近 3 日</option><option value="1">近 1 日</option></select></div>
+              <button class="primary-button wide" type="submit">提交检索</button>
+            </form>
+            <p class="notice" id="searchMessage" role="status" aria-live="polite"></p>
+          </section>
+        </div>
+        <section class="section" aria-labelledby="searches-title">
+          <div class="section-heading"><div><span class="eyebrow">MY SEARCHES</span><h2 id="searches-title">我的检索任务</h2></div><p>保留最近 10 个已结束任务</p></div>
+          <div class="updates" id="searchList"></div>
+        </section>
+      </div>
+
       <footer class="footer">
-        <span>学校画像系统 2.0 · 公司内部教学工具</span>
-        <span>私有文件 · 自动整理 · 线性撤销</span>
+        <span>乐读内部资料库 · 小规模多用户 MVP</span>
+        <span>用户隔离 · 私有文件 · 串行检索</span>
       </footer>
     </main>
   </div>
@@ -334,6 +436,10 @@
     let isAdmin = false;
     let canUndo = false;
     let turnstileId = null;
+    let loginTurnstileId = null;
+    let turnstileReady = null;
+    let accounts = [];
+    let searches = [];
 
     try {
       adminKey = urlKey || localStorage.getItem(STORAGE_KEY) || '';
@@ -354,6 +460,21 @@
     const undoButton = document.querySelector('#undoButton');
     const fileDrop = document.querySelector('#fileDrop');
     const fileInput = document.querySelector('#fileInput');
+    const loginScreen = document.querySelector('#loginScreen');
+    const appShell = document.querySelector('#appShell');
+    const loginForm = document.querySelector('#loginForm');
+    const loginButton = document.querySelector('#loginButton');
+    const loginMessage = document.querySelector('#loginMessage');
+    const phoneInput = document.querySelector('#phoneInput');
+    const schoolView = document.querySelector('#schoolView');
+    const networkView = document.querySelector('#networkView');
+    const accountList = document.querySelector('#accountList');
+    const accountMessage = document.querySelector('#accountMessage');
+    const searchList = document.querySelector('#searchList');
+    const searchMessage = document.querySelector('#searchMessage');
+    const adminUsers = document.querySelector('#adminUsers');
+    const adminUserList = document.querySelector('#adminUserList');
+    const adminMessage = document.querySelector('#adminMessage');
 
     class ApiError extends Error {
       constructor(message, status) { super(message); this.status = status; }
@@ -372,6 +493,24 @@
       let message = `请求失败（${response.status}）。`;
       try { message = (await response.json()).error || message; } catch { /* platform error */ }
       throw new ApiError(message, response.status);
+    }
+
+    function jsonRequest(method, value) {
+      return { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(value) };
+    }
+
+    function loadTurnstile() {
+      if (window.turnstile) return Promise.resolve();
+      if (turnstileReady) return turnstileReady;
+      turnstileReady = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        script.async = true;
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('人机验证加载失败，请刷新页面重试。'));
+        document.head.append(script);
+      });
+      return turnstileReady;
     }
 
     function node(tag, text = '', className = '') {
@@ -401,6 +540,44 @@
       button.type = 'button';
       button.addEventListener('click', () => handler(button));
       return button;
+    }
+
+    async function setupLogin(siteKey) {
+      if (!siteKey) {
+        showMessage(loginMessage, '登录验证尚未配置。', 'error');
+        return;
+      }
+      try {
+        await loadTurnstile();
+        if (loginTurnstileId === null) {
+          loginTurnstileId = window.turnstile.render('#loginTurnstile', {
+            sitekey: siteKey,
+            theme: 'light',
+            callback: () => { loginButton.disabled = false; },
+            'expired-callback': () => { loginButton.disabled = true; }
+          });
+        } else {
+          window.turnstile.reset(loginTurnstileId);
+        }
+      } catch (error) { showMessage(loginMessage, error.message, 'error'); }
+    }
+
+    async function enterApp(siteKey) {
+      loginScreen.hidden = true;
+      appShell.hidden = false;
+      const returnedSiteKey = await refreshData();
+      await refreshNetwork();
+      setupUpload(returnedSiteKey || siteKey);
+      if (isAdmin) await refreshAdminUsers();
+    }
+
+    async function showLogin() {
+      appShell.hidden = true;
+      loginScreen.hidden = false;
+      const response = await apiFetch('/api/auth/me');
+      const data = await response.json();
+      await setupLogin(data.turnstile_site_key || '');
+      phoneInput.focus();
     }
 
     function renderProfile() {
@@ -460,6 +637,139 @@
         }
         return row;
       }));
+    }
+
+    function renderAccounts() {
+      if (!accounts.length) {
+        accountList.replaceChildren(node('div', '尚未添加关注账号。', 'empty-state'));
+        return;
+      }
+      accountList.replaceChildren(...accounts.map(item => {
+        const row = node('div', '', 'item-row item-row-head');
+        row.append(node('strong', item.account_id));
+        row.append(actionButton('删除', button => deleteAccount(item, button), true));
+        return row;
+      }));
+    }
+
+    function renderSearches() {
+      if (!searches.length) {
+        searchList.replaceChildren(node('div', '暂无检索任务。', 'empty-state'));
+        return;
+      }
+      const labels = {
+        queued: '排队中', running: '检索中', completed: '已完成', partial: '部分完成',
+        blocked: '已阻断', failed: '失败'
+      };
+      searchList.replaceChildren(...searches.map(item => {
+        const row = node('article', '', 'update-row');
+        const copy = node('div', '', 'update-copy');
+        copy.append(node('strong', item.keywords.join(' AND ')));
+        copy.append(node('span', `${formatDate(item.created_at)} · 近 ${item.days} 日 · ${item.accounts.length} 个账号`, 'update-meta'));
+        copy.append(node('span', labels[item.status] || item.status, `status ${item.status}`));
+        if (item.error_detail) copy.append(node('p', item.error_detail, 'notice error'));
+        if (item.failures.length) {
+          const failures = node('ul', '', 'failure-list');
+          failures.append(...item.failures.map(failure => node('li', `${failure.account_id}：${failure.reason}`)));
+          copy.append(failures);
+        }
+        const resultList = node('div', '', 'search-results');
+        resultList.append(...item.results.map(result => {
+          const card = node('article', '', 'result-card');
+          const link = node('a', result.title);
+          link.href = result.url;
+          link.target = '_blank';
+          link.rel = 'noreferrer noopener';
+          card.append(link);
+          card.append(node('div', `${result.account_name} · ${formatDate(result.published_at)}`, 'result-meta'));
+          card.append(node('p', result.summary));
+          return card;
+        }));
+        if (item.results.length) copy.append(resultList);
+        row.append(copy);
+        if (['completed', 'partial', 'blocked', 'failed'].includes(item.status)) {
+          const actions = node('div', '', 'update-actions');
+          actions.append(actionButton('删除任务', button => deleteSearch(item, button), true));
+          row.append(actions);
+        }
+        return row;
+      }));
+    }
+
+    function renderAdminUsers(users) {
+      adminUserList.replaceChildren(...users.map(item => {
+        const row = node('div', '', 'item-row');
+        const head = node('div', '', 'item-row-head');
+        head.append(node('strong', `手机号尾号 ${item.phone_last4}`));
+        const actions = node('div', '', 'update-actions');
+        actions.append(actionButton('修改备注', button => editUserNote(item, button)));
+        actions.append(actionButton(item.enabled ? '禁用' : '启用', button => toggleUser(item, button), item.enabled));
+        head.append(actions);
+        row.append(head, node('span', item.note || '无备注', 'update-meta'));
+        return row;
+      }));
+    }
+
+    async function refreshNetwork() {
+      const [accountResponse, searchResponse] = await Promise.all([
+        apiFetch('/api/network/accounts'), apiFetch('/api/network/searches')
+      ]);
+      const [accountData, searchData] = await Promise.all([accountResponse.json(), searchResponse.json()]);
+      accounts = accountData.accounts || [];
+      searches = searchData.searches || [];
+      renderAccounts();
+      renderSearches();
+    }
+
+    async function refreshAdminUsers() {
+      const data = await (await apiFetch('/api/admin/users')).json();
+      renderAdminUsers(data.users || []);
+    }
+
+    async function deleteAccount(item, button) {
+      button.disabled = true;
+      try {
+        await apiFetch(`/api/network/accounts/${encodeURIComponent(item.id)}`, { method: 'DELETE' });
+        await refreshNetwork();
+        showMessage(accountMessage, '关注账号已删除。', 'success');
+      } catch (error) {
+        showMessage(accountMessage, error.message, 'error');
+        button.disabled = false;
+      }
+    }
+
+    async function deleteSearch(item, button) {
+      button.disabled = true;
+      try {
+        await apiFetch(`/api/network/searches/${encodeURIComponent(item.id)}`, { method: 'DELETE' });
+        await refreshNetwork();
+        showMessage(searchMessage, '检索任务及结果已删除。', 'success');
+      } catch (error) {
+        showMessage(searchMessage, error.message, 'error');
+        button.disabled = false;
+      }
+    }
+
+    async function updateUser(item, value, button) {
+      button.disabled = true;
+      try {
+        await apiFetch(`/api/admin/users/${encodeURIComponent(item.id)}`, jsonRequest('PATCH', value));
+        await refreshAdminUsers();
+        showMessage(adminMessage, '白名单用户已更新。', 'success');
+      } catch (error) {
+        showMessage(adminMessage, error.message, 'error');
+        button.disabled = false;
+      }
+    }
+
+    function editUserNote(item, button) {
+      const value = window.prompt('请输入新备注（最多 100 字）：', item.note || '');
+      if (value === null) return;
+      updateUser(item, { note: value }, button);
+    }
+
+    function toggleUser(item, button) {
+      updateUser(item, { enabled: !item.enabled }, button);
     }
 
     async function downloadDocument(item, button) {
@@ -533,7 +843,8 @@
       documents = Array.isArray(documentsData.documents) ? documentsData.documents : [];
       isAdmin = Boolean(profileData.is_admin && documentsData.is_admin);
       canUndo = Boolean(profileData.can_undo);
-      document.querySelector('#modeBadge').textContent = isAdmin ? '管理模式' : '老师查看';
+      document.querySelector('#modeBadge').textContent = isAdmin ? '管理模式' : '登录用户';
+      adminUsers.hidden = !isAdmin;
       renderProfile();
       renderDocuments();
       return profileData.turnstile_site_key || '';
@@ -549,15 +860,18 @@
         showMessage(uploadMessage, '上传验证尚未配置，当前只能查看学校画像。', 'error');
         return;
       }
-      const script = document.createElement('script');
-      script.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
-      script.async = true;
-      script.onload = () => {
-        turnstileId = window.turnstile.render('#turnstileWidget', { sitekey: siteKey, theme: 'light' });
-        uploadButton.disabled = false;
-      };
-      script.onerror = () => showMessage(uploadMessage, '人机验证加载失败，请刷新页面重试。', 'error');
-      document.head.append(script);
+      loadTurnstile().then(() => {
+        if (turnstileId === null) {
+          turnstileId = window.turnstile.render('#turnstileWidget', {
+            sitekey: siteKey,
+            theme: 'light',
+            callback: () => { uploadButton.disabled = false; },
+            'expired-callback': () => { uploadButton.disabled = true; }
+          });
+        } else {
+          window.turnstile.reset(turnstileId);
+        }
+      }).catch(error => showMessage(uploadMessage, error.message, 'error'));
     }
 
     uploadForm.addEventListener('submit', async event => {
@@ -579,10 +893,95 @@
         showMessage(uploadMessage, error.message || '上传失败。', 'error');
       } finally {
         uploadButton.textContent = '上传并自动整理';
-        uploadButton.disabled = false;
+        uploadButton.disabled = !isAdmin;
         if (!isAdmin && turnstileId !== null && window.turnstile) window.turnstile.reset(turnstileId);
       }
     });
+
+    loginForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      loginButton.disabled = true;
+      showMessage(loginMessage, '正在登录…');
+      const turnstileToken = loginTurnstileId === null || !window.turnstile
+        ? '' : window.turnstile.getResponse(loginTurnstileId);
+      try {
+        await apiFetch('/api/auth/login', jsonRequest('POST', {
+          phone: phoneInput.value,
+          turnstile_token: turnstileToken
+        }));
+        phoneInput.value = '';
+        showMessage(loginMessage);
+        await enterApp('');
+      } catch (error) {
+        showMessage(loginMessage, error.message || '登录失败。', 'error');
+      } finally {
+        if (loginTurnstileId !== null && window.turnstile) window.turnstile.reset(loginTurnstileId);
+      }
+    });
+
+    document.querySelector('#logoutButton').addEventListener('click', async () => {
+      try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch { /* cookie is cleared by expiry too */ }
+      documents = [];
+      profile = null;
+      accounts = [];
+      searches = [];
+      isAdmin = false;
+      await showLogin();
+    });
+
+    document.querySelector('#accountForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      const input = document.querySelector('#accountIdInput');
+      try {
+        await apiFetch('/api/network/accounts', jsonRequest('POST', { account_id: input.value }));
+        input.value = '';
+        await refreshNetwork();
+        showMessage(accountMessage, '关注账号已添加。', 'success');
+      } catch (error) { showMessage(accountMessage, error.message, 'error'); }
+    });
+
+    document.querySelector('#searchForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      const first = document.querySelector('#keywordOne');
+      const second = document.querySelector('#keywordTwo');
+      const keywords = [first.value, second.value].map(value => value.trim()).filter(Boolean);
+      try {
+        await apiFetch('/api/network/searches', jsonRequest('POST', {
+          keywords,
+          days: Number(document.querySelector('#searchDays').value)
+        }));
+        first.value = '';
+        second.value = '';
+        await refreshNetwork();
+        showMessage(searchMessage, '检索任务已进入队列。', 'success');
+      } catch (error) { showMessage(searchMessage, error.message, 'error'); }
+    });
+
+    document.querySelector('#adminUserForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      const phone = document.querySelector('#adminPhoneInput');
+      const note = document.querySelector('#adminNoteInput');
+      try {
+        await apiFetch('/api/admin/users', jsonRequest('POST', { phone: phone.value, note: note.value }));
+        phone.value = '';
+        note.value = '';
+        await refreshAdminUsers();
+        showMessage(adminMessage, '白名单用户已添加。', 'success');
+      } catch (error) { showMessage(adminMessage, error.message, 'error'); }
+    });
+
+    document.querySelectorAll('.side-nav button').forEach(button => button.addEventListener('click', async () => {
+      const network = button.dataset.view === 'network';
+      schoolView.hidden = network;
+      networkView.hidden = !network;
+      document.querySelector('#pageTitle').textContent = network ? '网络资料' : '学校资料';
+      document.querySelector('.mobile-context').textContent = network ? '网络资料' : '目标学校A · 学校资料';
+      document.querySelectorAll('.side-nav button').forEach(item => item.classList.toggle('active', item === button));
+      if (network) {
+        try { await refreshNetwork(); } catch (error) { showMessage(searchMessage, error.message, 'error'); }
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }));
 
     undoButton.addEventListener('click', undoLatest);
 
@@ -598,21 +997,10 @@
       if (event.dataTransfer.files.length) fileInput.files = event.dataTransfer.files;
     });
 
-    refreshData()
-      .then(setupUpload)
-      .catch(error => {
-        showMessage(profileMessage, error.message || '无法连接学校资料库，请刷新页面重试。', 'error');
-        showMessage(uploadMessage, '资料库未连接，暂时无法上传。', 'error');
-      });
-
-    const navLinks = [...document.querySelectorAll('.side-nav a')];
-    const observer = new IntersectionObserver(entries => {
-      entries.forEach(entry => {
-        if (!entry.isIntersecting) return;
-        navLinks.forEach(link => link.classList.toggle('active', link.hash === `#${entry.target.id}`));
-      });
-    }, { rootMargin: '-25% 0px -65% 0px' });
-    navLinks.forEach(link => observer.observe(document.querySelector(link.hash)));
+    apiFetch('/api/auth/me')
+      .then(response => response.json())
+      .then(data => data.authenticated ? enterApp(data.turnstile_site_key || '') : showLogin())
+      .catch(error => showMessage(loginMessage, error.message || '无法连接资料库。', 'error'));
   </script>
 </body>
 </html>

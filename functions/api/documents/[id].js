@@ -1,6 +1,6 @@
-import { json, withAuth } from '../../_shared.js';
+import { MACHINE_XHS_SCOPE, json, withAdminUser } from '../../_shared.js';
 
-export const onRequestDelete = withAuth(async ({ env, params }) => {
+export const onRequestDelete = withAdminUser(async ({ env, params }) => {
   const document = await env.DB.prepare(`
     SELECT id, object_key, undone_at,
       EXISTS (
@@ -13,7 +13,8 @@ export const onRequestDelete = withAuth(async ({ env, params }) => {
       ) AS is_current_source
     FROM documents
     WHERE id = ?1 AND deleted_at IS NULL
-  `).bind(params.id).first();
+      AND (scope IS NULL OR scope <> ?2)
+  `).bind(params.id, MACHINE_XHS_SCOPE).first();
   if (!document) return json({ error: '资料不存在。' }, 404);
   if (document.is_current_source || (!document.undone_at && document.has_changes)) {
     return json({ error: '这份资料仍在有效画像中，请先按顺序撤销对应更新。' }, 409);
@@ -38,4 +39,4 @@ export const onRequestDelete = withAuth(async ({ env, params }) => {
   ]);
   if (!results[2].meta.changes) return json({ error: '资料不存在。' }, 404);
   return json({ id: params.id, deleted: true });
-});
+}, true);

@@ -98,6 +98,9 @@ class ProfileDB {
         return { results: [] };
       },
       async first() {
+        if (/FROM sessions AS session/.test(sql)) {
+          return { id: 'user-a', phone_last4: '8000', note: '测试用户', expires_at: '2099-01-01T00:00:00.000Z' };
+        }
         if (/JOIN profile_history AS history/.test(sql)) {
           const document = database.latestUndo();
           return document ? { id: document.id } : null;
@@ -221,6 +224,7 @@ function env() {
 
 function request(path, options = {}, authorized = false) {
   const headers = new Headers(options.headers || {});
+  if (!headers.has('Cookie')) headers.set('Cookie', 'ledu_session=test-session');
   if (authorized) headers.set('Authorization', `Bearer ${ADMIN_KEY}`);
   return new Request(`https://archive.test${path}`, { ...options, headers });
 }
@@ -252,11 +256,15 @@ function addAnalyzable(bindings, id, response, values = {}) {
   bindings.ARK_FETCH = async () => arkResponse(response);
 }
 
-test('profile is public, exposes active card sources, and only advertises undo to admins', async () => {
+test('profile is login-only, exposes active school-card sources, and only advertises undo to admins', async () => {
   const bindings = env();
+  const anonymous = await onRequestGet({
+    request: request('/api/profile', { headers: { Cookie: '' } }), env: bindings
+  });
+  assert.equal(anonymous.status, 401);
   const empty = await profile(bindings);
   assert.equal(empty.profile.filled, 0);
-  assert.equal(empty.profile.total, 9);
+  assert.equal(empty.profile.total, 8);
   assert.equal(empty.profile.percentage, 0);
   assert.equal(empty.can_undo, false);
 
@@ -324,6 +332,10 @@ test('Xiaohongshu machine material can update only the other products card', asy
   assert.equal(bindings.DB.sections.get(OTHER_PRODUCTS_SECTION_KEY).content, '2026-08-31｜公开笔记示例');
   assert.equal(bindings.DB.sections.get('resources').content, '原有教学资源');
   assert.equal(bindings.DB.documents.get('doc-xhs').scope, MACHINE_XHS_SCOPE);
+  const visibleProfile = await profile(bindings);
+  assert.equal(visibleProfile.profile.sections.length, 8);
+  assert.equal(visibleProfile.profile.sections.some(section => section.key === OTHER_PRODUCTS_SECTION_KEY), false);
+  assert.equal(bindings.DB.sections.get(OTHER_PRODUCTS_SECTION_KEY).content, '2026-08-31｜公开笔记示例');
   assert.equal((await undo(bindings)).status, 200);
   assert.equal(bindings.DB.sections.get(OTHER_PRODUCTS_SECTION_KEY).content, '');
   assert.equal(bindings.DB.sections.get('resources').content, '原有教学资源');

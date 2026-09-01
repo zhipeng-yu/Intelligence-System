@@ -7,7 +7,7 @@ import {
   SCHOOL_PROFILE_SECTION_KEYS,
   isAdmin,
   json,
-  withPublic
+  withUser
 } from '../../../_shared.js';
 
 const ARK_URL = 'https://ark.cn-beijing.volces.com/api/v3/responses';
@@ -97,7 +97,7 @@ async function failAnalysis(env, id, message) {
   `).bind(message, analyzedAt, id).run();
 }
 
-export const onRequestPost = withPublic(async ({ request, env, params }) => {
+export const onRequestPost = withUser(async ({ request, env, params }) => {
   const document = await env.DB.prepare(`
     SELECT
       id, note, category, scope, ai_status, auto_analyzed,
@@ -229,4 +229,4 @@ export const onRequestPost = withPublic(async ({ request, env, params }) => {
     await failAnalysis(env, params.id, publicError);
     return json({ error: publicError }, 502);
   }
-});
+}, true);

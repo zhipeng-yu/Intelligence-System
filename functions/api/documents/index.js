@@ -1,12 +1,15 @@
 import {
   MACHINE_XHS_SCOPE,
+  clearSessionCookie,
+  getUserSession,
   isAdmin,
   isIngest,
   json,
   networkHash,
   readUpload,
   validateTurnstile,
-  withPublic
+  withPublic,
+  withUser
 } from '../../_shared.js';
 
 const columns = `
@@ -14,15 +17,16 @@ const columns = `
   uploaded_at, original_name, mime_type, size_bytes, undone_at
 `;
 
-export const onRequestGet = withPublic(async ({ request, env }) => {
+export const onRequestGet = withUser(async ({ request, env }) => {
   const { results } = await env.DB.prepare(`
     SELECT ${columns}
     FROM documents
     WHERE deleted_at IS NULL
+      AND (scope IS NULL OR scope <> ?1)
     ORDER BY uploaded_at DESC
-  `).all();
+  `).bind(MACHINE_XHS_SCOPE).all();
   return json({ documents: results || [], is_admin: await isAdmin(request, env) });
-});
+}, true);
 
 export const onRequestPost = withPublic(async ({ request, env }) => {
   let form;
@@ -34,6 +38,9 @@ export const onRequestPost = withPublic(async ({ request, env }) => {
 
   const admin = await isAdmin(request, env);
   const ingest = await isIngest(request, env);
+  if (!ingest && !await getUserSession(request, env)) {
+    return json({ error: '请先登录。' }, 401, { 'Set-Cookie': clearSessionCookie() });
+  }
   let addressHash = null;
   if (!admin) {
     const address = request.headers.get('CF-Connecting-IP') || '';

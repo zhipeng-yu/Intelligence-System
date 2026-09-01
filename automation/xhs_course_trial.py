@@ -169,23 +169,23 @@ def load_skill():
     return sync_playwright, XiaohongshuClient, FeedDetailAction, LoginAction, UserProfileAction
 
 
-def edge_client_type():
+def edge_client_type(profile_path: Path = PROFILE_PATH):
     sync_playwright, base_client, feed_action, login_action, user_action = load_skill()
 
     class EdgeClient(base_client):
         """Transparent Playwright control of the installed system Edge."""
 
         def __init__(self, headless: bool):
-            super().__init__(headless=headless, cookie_path=str(ROOT / "unused-cookie-backup.json"),
-                             user_data_dir=str(PROFILE_PATH), timeout=45)
+            super().__init__(headless=headless, cookie_path=str(profile_path.parent / "unused-cookie-backup.json"),
+                             user_data_dir=str(profile_path), timeout=45)
 
         def start(self):
             if not EDGE.is_file():
                 raise StopTrial("edge", "未找到本机 Microsoft Edge")
-            PROFILE_PATH.mkdir(parents=True, exist_ok=True)
+            profile_path.mkdir(parents=True, exist_ok=True)
             self.playwright = sync_playwright().start()
             self.context = self.playwright.chromium.launch_persistent_context(
-                user_data_dir=str(PROFILE_PATH),
+                user_data_dir=str(profile_path),
                 executable_path=str(EDGE),
                 headless=self.headless,
                 locale="zh-CN",
@@ -214,6 +214,15 @@ def edge_client_type():
                 self.context.close()
             if self.playwright:
                 self.playwright.stop()
+            # Dedicated automation profiles keep login state, but not visited URLs
+            # that may contain process-local xsec_token values.
+            for relative in ("Default/History", "Default/History-journal", "Default/Visited Links"):
+                (profile_path / relative).unlink(missing_ok=True)
+            sessions = profile_path / "Default" / "Sessions"
+            if sessions.is_dir():
+                for path in sessions.iterdir():
+                    if path.is_file():
+                        path.unlink(missing_ok=True)
 
         def navigate(self, url: str, wait_until: str = "domcontentloaded"):
             elapsed = time.monotonic() - self._last_navigate_time

@@ -32,6 +32,9 @@ class FakeDB {
         return { results };
       },
       async first() {
+        if (/FROM sessions AS session/.test(sql)) {
+          return { id: 'user-a', phone_last4: '8000', note: '测试用户', expires_at: '2099-01-01T00:00:00.000Z' };
+        }
         if (/COUNT\(\*\)/.test(sql)) {
           const [hash, since] = this.values;
           return { count: [...database.rows.values()].filter(row => row.network_hash === hash && row.uploaded_at >= since).length };
@@ -119,6 +122,7 @@ function env() {
 
 function request(path, options = {}, authorized = false) {
   const headers = new Headers(options.headers || {});
+  if (!headers.has('Cookie')) headers.set('Cookie', 'ledu_session=test-session');
   if (authorized) headers.set('Authorization', `Bearer ${ADMIN_KEY}`);
   return new Request(`https://archive.test${path}`, { ...options, headers });
 }
@@ -141,11 +145,16 @@ function uploadRequest(file, fields = {}, authorized = false) {
   }, authorized);
 }
 
-test('teachers can list documents but download and delete require the admin key', async () => {
+test('logged-in users can list documents while download and delete also require the admin key', async () => {
   const bindings = env();
   const list = await onRequestGet({ request: request('/api/documents'), env: bindings });
   assert.equal(list.status, 200);
   assert.equal((await list.json()).is_admin, false);
+
+  const anonymous = await onRequestGet({
+    request: request('/api/documents', { headers: { Cookie: '' } }), env: bindings
+  });
+  assert.equal(anonymous.status, 401);
 
   const responses = await Promise.all([
     onRequestFile({ request: request('/api/documents/id/file'), env: bindings, params: { id: 'id' } }),

@@ -1,11 +1,12 @@
-import { attachmentDisposition, json, withAuth } from '../../../_shared.js';
+import { MACHINE_XHS_SCOPE, attachmentDisposition, json, withAdminUser } from '../../../_shared.js';
 
-export const onRequestGet = withAuth(async ({ env, params }) => {
+export const onRequestGet = withAdminUser(async ({ env, params }) => {
   const document = await env.DB.prepare(`
     SELECT original_name, object_key, mime_type, size_bytes
     FROM documents
     WHERE id = ?1 AND deleted_at IS NULL
-  `).bind(params.id).first();
+      AND (scope IS NULL OR scope <> ?2)
+  `).bind(params.id, MACHINE_XHS_SCOPE).first();
 
   if (!document) return json({ error: '资料不存在。' }, 404);
 
@@ -21,4 +22,4 @@ export const onRequestGet = withAuth(async ({ env, params }) => {
       'X-Content-Type-Options': 'nosniff'
     }
   });
-});
+}, true);
