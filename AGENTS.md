@@ -8,7 +8,7 @@
 
 ## 当前状态
 
-仓库已实现小规模多用户网络资料 MVP；生产仍运行源码 `538f8c6`，远端 D1 仍到 `0004_add_other_products_section.sql`。新 `0005`、Secret、Pages 部署、真实 Edge 检索和旧七日任务停用均未执行，发布边界以 `handoff.md` 为准。
+小规模多用户网络资料 MVP 已部署；生产部署 `8cc8a54f` 运行源码 `aed9c23`，远端 D1 已到 `0005_add_network_materials.sql`，所需 Secret 已配置。`ADMIN_KEY` 已于 2026-09-02 轮换并随当前部署生效；生产有 1 个 `queued` 检索任务，真实 Edge 检索、新工作器计划任务和旧七日任务停用尚未执行。
 
 旧七日任务只有在新功能真实验收后才能停用。停用时保留旧 `seen.json`、运行状态和 `held_candidates`，不删除历史候选。
 

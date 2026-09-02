@@ -4,7 +4,7 @@
 
 生产地址：<https://ledu-school-archive.pages.dev>
 
-当前仓库已实现“小规模多用户网络资料 MVP”，但生产仍是旧版：Pages 源码提交 `538f8c6`，远端 D1 只应用到 `0004_add_other_products_section.sql`。本轮没有执行生产迁移、Secret 配置、部署、真实 Edge 检索、真实 AI 调用或远端数据删除。
+“小规模多用户网络资料 MVP”已部署到生产：Pages 源码提交为 `aed9c23`，远端 D1 已应用到 `0005_add_network_materials.sql`，所需 Secret 已配置。真实 Edge 检索、新工作器计划任务和旧七日任务停用尚未执行。
 
 ## 登录与权限
 

@@ -1,13 +1,13 @@
 # 乐读内部资料库运维交接
 
-更新日期：2026-09-01
+更新日期：2026-09-02
 
 ## 当前结论
 
-- 仓库已完成“小规模多用户网络资料 MVP”的最小代码、迁移、自动化测试和系统 Edge 页面验收。
-- 生产地址仍为 <https://ledu-school-archive.pages.dev>，Pages 仍运行源码提交 `538f8c6`，远端 D1 仍只应用到 `0004_add_other_products_section.sql`。
-- 本轮未获授权且未执行：远端 `0005`、生产 Secret 配置、Pages 部署、真实生产 Edge 检索、生产 AI 或远端数据删除。
-- 旧 `Ledu-Xiaohongshu-Course-Trial` 任务未停用。本轮没有读取或改变其实时状态；新功能真实验收后才能停用，并须保留旧 `seen.json`、状态文件和 `held_candidates`。
+- “小规模多用户网络资料 MVP”已部署到 <https://ledu-school-archive.pages.dev>；当前生产部署 `8cc8a54f` 使用源码提交 `aed9c23`，远端 D1 已应用到 `0005_add_network_materials.sql`。
+- 所需生产 Secret 已配置；`ADMIN_KEY` 于 2026-09-02 完成轮换并随当前部署生效，旧的标准域名管理员链接已经失效。秘密与新管理链接均未写入仓库或文档。
+- 生产现有 1 个 `queued` 网络检索任务。尚未执行真实 Edge 检索，也未注册 `Ledu-Network-Materials-Worker` 计划任务。
+- 旧 `Ledu-Xiaohongshu-Course-Trial` 任务仍为 `Ready`。新功能真实验收后才能停用，并须保留旧 `seen.json`、状态文件和 `held_candidates`。
 - 现有生产 D1、私有 R2、Workers AI 与方舟闭环保持原状。秘密和管理链接不得进入 Git、聊天、日志、截图或普通文档。
 
 ## 新源码结构
@@ -34,23 +34,19 @@
 - `node --test tests/profile.test.mjs`：9 项通过；包含第九卡数据存在但页面/API 隐藏。
 - `node --test tests/network.test.mjs`：4 组通过；覆盖登录不可枚举、Cookie、注销/禁用、双重管理员鉴权、用户隔离、资源 ID 越权、账号/关键词/日期限制、每日配额、独立工作器密钥、原子租约、重认领、回传校验、幂等和最近 10 项清理。
 - 既有 Conda Python 环境运行 `tests/test_xhs_course_trial.py`：9 项通过。
-- 同一环境运行 `tests/test_network_worker.py`：8 项通过；覆盖视频排除、AND 匹配、摘要、30 条上限、单账号失败、blocked 停止和任务计划边界。
+- 同一环境运行 `tests/test_network_worker.py`：9 项通过；覆盖时间窗口预筛选、视频排除、AND 匹配、摘要、30 条上限、单账号失败、blocked 停止和任务计划边界。
 - 全新临时 D1 依次应用 `0001`～`0005` 成功。
 - Pages Functions 构建成功。
 - 系统 Edge 完成登录后主流程、8 张学校卡片、网络账号/检索、桌面布局、390px、移动端主导航、键盘焦点和控制台验收；控制台无错误，截图已更新。
 
 测试均使用模拟数据，不访问真实小红书、不调用真实 AI，也没有读取现有 Secret、Cookie 或 Edge 会话文件。
 
-## 最小上线动作
+## 剩余上线动作
 
-以下动作必须逐项获得新的明确授权：
+以下动作仍须获得明确授权：
 
-1. 再次 fetch，只读确认本地 `main` 是 `origin/main` 的正常快进。
-2. 在安全终端生成并配置 `PHONE_PEPPER` 与 `NETWORK_WORKER_KEY`，不输出值。
-3. 用同一 `PHONE_PEPPER` 对首位管理员手机号计算 HMAC，并在安全操作中向 `users` 写入首个启用用户；这是白名单接口同时要求会话和 `ADMIN_KEY` 后的唯一一次引导。
-4. 应用远端 `0005_add_network_materials.sql`。
-5. 部署 Pages。
-6. 用合成账号/关键词完成登录、隔离、配额和系统 Edge 真实检索验收；不调用 AI。
-7. 验收成功后注册新的一分钟 `IgnoreNew` 任务并停用旧七日任务，保留旧状态与候选文件。
+1. 使用新管理员链接复核管理模式。
+2. 在专用系统 Edge 会话中完成一次只读真实检索，处理现有 `queued` 任务。
+3. 验收成功后注册新的一分钟 `IgnoreNew` 任务并停用旧七日任务，保留旧状态与候选文件。
 
 生产命令只在获得授权后执行。禁止强推；认证失败、冲突、非快进或未知远端提交时立即停止。
