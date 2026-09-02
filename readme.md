@@ -42,6 +42,8 @@
 
 新任务首次自动触发后成功处理 2 个账号的队列任务，状态为 `completed`，无账号失败或安全验证，未命中结果。旧七日任务已禁用但未删除；旧 `seen.json`、运行状态和 `held_candidates` 保持原样。
 
+当前版本按任务数限流，但尚未持久化主页候选、详情打开和关键词检查漏斗；30 分钟租约也短于本机 45 分钟执行上限，过期任务可重新认领。用户已批准下一窗口实施最小优化：全账号候选先汇总、标题只用于详情优先级、30 条早停、任务/每日详情预算、过期不自动重跑、服务端全局串行和聚合指标展示。完成后页面应同时显示单任务详情打开数，以及按实际执行日计算的今日详情实际值、预留值和剩余额度。该优化尚未部署，详见 `new-window-prompt.md`。
+
 ## 数据与接口
 
 `0005_add_network_materials.sql` 只新增 `users`、`sessions`、`watched_accounts`、`network_search_jobs`、`network_search_results`。任务状态固定为 `queued`、`running`、`completed`、`partial`、`blocked`、`failed`。

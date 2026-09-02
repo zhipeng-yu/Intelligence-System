@@ -1,43 +1,104 @@
-# 网络资料真实验收与上线收尾交接
+# 网络资料效率与访问预算优化交接
 
-请接手 `D:\Project\ledu_project\Intelligence System`，使用 **ponytail full**，完成现有“小规模多用户网络资料 MVP”的一次真实只读验收和最小上线收尾。不要新增功能、依赖、服务或设计。
+请接手 `D:\Project\ledu_project\Intelligence System`，全程使用 **ponytail full**，按本交接完成网络资料工作器的最小高收益优化。用户已经明确要求实施代码优化；不要再次讨论“是否需要爬取”，目标是在继续真实只读采集的前提下，提高单位访问产出并封住异常重复访问。
 
-开始前完整阅读 `AGENTS.md`、`readme.md`、`handoff.md`、`school-profile-handoff.md`、相关代码和测试，以及固定提交 `afa96802d3e61cdd5e7bd7b37ec59182bbe07d37` 对应的已安装 `xiaohongshu-skill` 全部必读指令与 Edge、登录、主页、详情实现。确认位于 `main`；先 fetch，再只读核对 `origin/main` 没有未知变化。禁止 pull、强推和非快进推送。
+开始前完整阅读 `AGENTS.md`、`readme.md`、`handoff.md`、`school-profile-handoff.md`、相关代码和测试，以及固定提交 `afa96802d3e61cdd5e7bd7b37ec59182bbe07d37` 对应的已安装 `xiaohongshu-skill` 全部必读指令与 Edge、登录、主页、详情实现。确认位于 `main`；先 fetch，再只读比较 `origin/main`，禁止 pull、强推和非快进推送。
 
-## 当前真实状态
+## 交接时真实状态
 
-- 生产 Pages 部署为 `8cc8a54f`，源码提交为 `aed9c23`；远端 D1 已应用到 `0005_add_network_materials.sql`，所需生产 Secret 已配置。
-- `ADMIN_KEY` 已于 2026-09-02 轮换并重新部署；旧规范管理员链接已经失效。不要读取、输出或重新生成任何管理链接。
-- 生产有 1 个待处理的网络资料任务。新工作器尚未进行真实 Edge 检索验收。
-- 本机工作器凭据和专用 Edge 用户目录已经存在；尚无工作器 `state.json`，也未注册 `Ledu-Network-Materials-Worker` 计划任务。
-- 旧 `Ledu-Xiaohongshu-Course-Trial` 计划任务仍为 `Ready`。新功能真实验收成功前不得停用；无论结果如何，都不得删除旧 `seen.json`、运行状态或 `held_candidates`。
-- 当前代码会先按用户选择的近 1/3/7 日窗口筛选主页候选，只打开窗口内图文详情；它是只读流程，不点赞、收藏、评论、关注或发布，不保存完整正文、媒体、评论、用户资料或临时 token，也不调用 AI。
-- 用户已经同意用自己的小红书主账号进行一次小规模只读测试；这不代表账号已经登录或检索已经完成。
+- 本地与 `origin/main` 均为 `74fd525f67d21eb17e867b19ece79621d839757b`，工作区干净。
+- 生产 Pages 部署 `8cc8a54f` 仍运行源码 `aed9c23`；远端 D1 只到 `0005_add_network_materials.sql`，现有 Secret 已配置。
+- 交接前只读查询生产 D1：共 1 个历史任务，`queued=0`、`running=0`、`blocked=0`。开始时重新核对聚合状态，不读取任务内容或任何秘密。
+- `Ledu-Network-Materials-Worker` 为 `Ready`、每分钟触发、`MultipleInstances IgnoreNew`、执行上限 45 分钟；本地 halt 状态为 false。
+- 旧 `Ledu-Xiaohongshu-Course-Trial` 已禁用但未删除；旧 `seen.json`、状态与 `held_candidates` 必须继续保留。
+- 新计划任务直接从本工作区运行 `automation.network_worker`。**修改工作器文件前必须先说明影响并取得用户同意临时禁用该计划任务；否则未提交的半成品可能被真实调度执行。** 完成验证后也不得自行恢复或更新计划任务，需再次得到明确授权。
 
-## 只做以下步骤
+## 已确定的技术结论
 
-1. 先核对上述状态仍然成立。不得读取或输出 Secret、Cookie、完整手机号、管理链接、Edge 会话文件或原始凭据。
-2. 用户在电脑旁时，用仓库当前 Conda Python 启动专用 Edge 登录修复：
+- 继续采集是产品前提。第一阶段保留系统 Microsoft Edge + Python Playwright；不是浏览器插件，也不改成普通 HTTP 爬虫。
+- 已阅读用户提供的 CSDN 文章。只借鉴“列表 → 详情 → 解析 → 保存”的分阶段漏斗、明确停止条件和计数；不采用签名逆向、Cookie/IP 轮换、代理池、并发、媒体下载或完整正文保存。
+- 当前已经在主页按发布时间排除窗口外候选，并在详情再次校验时间。
+- 标题只用于安排详情打开优先级，不能直接排除标题未命中的候选，因为关键词可能只出现在正文。
+- 第一阶段不做 Edge 网络响应监听。先用计数证明主页候选阶段确实是瓶颈；只有实测证明必要时再加，禁止为未来预建抽象。
+- 保留每账号 20 条候选、每任务 30 条结果、每人每天 3 个任务、全站每天 20 个任务和 1～2 个 AND 关键词等既有产品边界。
 
-   ```powershell
-   & "$env:LOCALAPPDATA\LeduSchoolArchive\xhs-course-trial\conda-env\python.exe" -m automation.network_worker repair-login
-   ```
+## 已确认的当前缺口
 
-   由用户亲自在打开的 Edge 中登录并处理任何验证。不要代填账号或密码，不要查看账号私有内容，也不要改用用户日常浏览器或 App。
-3. 登录完成后，向用户明确说明将只领取现有 1 个队列任务、执行一次只读检索且不会互动或调用 AI；获得用户当场确认后，仅运行一次：
+1. D1 只有 `attempt_count`，没有主页候选、初筛候选、详情打开、关键词检查和命中数量；零结果无法解释。
+2. 每日 3/20 限制的是任务创建数，不是实际浏览发生日的详情访问预算。
+3. 30 分钟租约短于计划任务 45 分钟执行上限；过期 `running` 可无限重新认领，崩溃或回传失败会从头重复浏览。
+4. `IgnoreNew` 只约束这一台机器；claim API 没有服务端全局 `running` 锁。
+5. 当前逐账号“读主页后立即开详情”，无法先合并全部账号候选、去重、排序和按标题优先处理。
+6. 30 条只在结果汇总时截断，达到 30 条后仍会继续打开详情。
+7. 安全停机主要是本地状态；`wait_for_initial_state` 的验证码异常存在被归为普通账号失败的窄缝隙。
 
-   ```powershell
-   & "$env:LOCALAPPDATA\LeduSchoolArchive\xhs-course-trial\conda-env\python.exe" -m automation.network_worker run
-   ```
+## 本轮必须实现
 
-4. 若出现验证码、登录失效、安全验证或风控提示，立即停止；保持任务为 `blocked`，通知用户并等待人工恢复。禁止自动重试、验证码绕过、Chrome、下载版 Chromium、stealth、指纹伪装、代理池或并发浏览器。
-5. 检索结束后核对该任务是否为 `completed`、`partial`、`blocked` 或 `failed`，并让用户在生产页面确认结果。只报告完成验收所需的信息，不输出无关账号内容。
-6. 只有任务为 `completed` 或可接受的 `partial`、没有安全验证问题且用户确认页面结果正确后，才再次取得用户明确授权并执行上线收尾：
+### 1. 最小 D1 数据模型
 
-   - 运行 `& "$env:LOCALAPPDATA\LeduSchoolArchive\xhs-course-trial\conda-env\python.exe" -m automation.network_worker schedule` 注册新工作器计划任务；
-   - 验证其为全局串行、每分钟触发且使用 `IgnoreNew`；
-   - 仅禁用旧 `Ledu-Xiaohongshu-Course-Trial` 计划任务，不删除任务或历史文件。
+新增顺序迁移 `0006`，优先直接扩展 `network_search_jobs`，不要建立通用遥测系统。至少保存非负整数：
 
-7. 按实际结果精简更新 `readme.md`、`handoff.md`、`school-profile-handoff.md` 和 `AGENTS.md`。运行规定测试、构建和全新本地 `0001`～`0005` 迁移；只提交本次文件。提交后再次 fetch 并只读比较，确认可快进后正常推送 `origin/main`。
+- `detail_budget`
+- `homepage_candidates`
+- `eligible_candidates`
+- `detail_opens`
+- `keyword_checks`
+- `matched_results`
 
-除专用 Edge 中必须由用户完成的登录和两次明确授权外，不要停下来重复询问已经能从仓库确认的事项。任何认证失败、非快进、未知远端变化或生产安全验证都立即停止并如实报告。
+另保存短枚举 `termination_reason`、计数是否完整和用于上海自然日预算的日期字段。指标只存聚合数字，不保存候选正文、媒体、评论、用户资料、临时 token 或浏览器请求头。
+
+如要实现真正的跨进程安全停机，可增加一个单行工作器控制表；不要增加第三方队列、服务或缓存。
+
+### 2. 认领、预算与租约
+
+- 服务器端始终最多一个 `running` 任务，不能只依赖 Windows `IgnoreNew`。
+- 租约改为 50 分钟，与 45 分钟进程上限留出回传余量；工作器运行到 40 分钟后不得开始新的详情访问。
+- 禁止重新认领过期 `running`。下次 claim 时把过期任务结束为 `failed`（明确 `lease_expired`），然后才考虑领取队列任务；不要自动从头重跑。
+- 初始全站共享详情预算为 **180 次/Asia/Shanghai 自然日**。预算属于唯一的外部小红书登录会话，而不是内部用户。
+- 领取前按 `账号数 × 20` 预留完整最坏额度；额度不足就保留 `queued`，不要开始一个注定不完整的任务。
+- 正常、partial 或 blocked 回传后，将保留额度收敛为实际 `detail_opens`，释放未使用额度；硬崩溃或租约过期时保留完整预留额度，宁可保守少跑，也不能低估风险。
+- 尽量复用 `network_search_jobs` 和 D1 条件更新完成原子控制；不要新增每详情一次的远端计数 API，除非证明预留模型无法满足约束。
+
+### 3. 工作器漏斗与打开顺序
+
+- 先读取全部账号各最多 20 条主页候选，再统一处理，不要边读一个账号边打开它的全部详情。
+- 统计主页返回的候选数；排除视频、时间窗口外、无效 ID 或缺少当前会话临时访问参数的候选；再跨账号按帖子 ID 去重。
+- 对剩余候选按“主页标题命中的关键词数降序、发布时间降序”打开详情。标题未命中只能排在后面，不能直接跳过。
+- `detail_opens` 必须在调用详情导航前增加，失败也算一次；`keyword_checks` 只在得到可用图文详情并真正执行 AND 判断时增加。
+- 达到 30 个唯一结果、用完任务额度、进入 40 分钟执行截止、安全阻断或候选耗尽时立即停止。
+- 最终结果仍按发布时间倒序，仍只保存最多 30 条；`matched_results` 必须与最终唯一结果数量一致。
+- 捕获验证码、登录失效和安全验证的所有路径，包括 `wait_for_initial_state`；统一 blocked、通知、停止后续详情和后续任务，等待人工显式恢复。
+
+### 4. API 与页面
+
+- worker 回传的计数和停止原因必须由服务端严格校验，至少满足：
+
+  ```text
+  0 <= matched_results <= keyword_checks <= detail_opens <= eligible_candidates <= homepage_candidates <= 60
+  ```
+
+- 用户查询接口返回这些聚合指标。每个已结束任务简洁显示：主页候选、初筛剩余、详情打开、关键词检查、命中数量和停止原因。
+- 网络资料区域同时显示：**今日累计实际打开详情 `N / 180`、当前预留额度和今日剩余额度**；“今日”按任务实际认领的 Asia/Shanghai 自然日计算，不按任务创建日计算。
+- 正常结束、partial 或 blocked 且成功回传时，`detail_opens` 计入今日实际值。过期或硬崩溃任务无法完整上报时，必须显示“实际统计未完整上报”以及其保守占用的预留额度，不能用 0 冒充真实访问数。
+- 不改变标题＋公开文案的 NFKC、小写、空白归一化和 AND 子串匹配语义。
+
+## 明确不做
+
+- 不做签名逆向、直接私有接口、Cookie/IP 轮换、代理、并发浏览器、stealth、指纹伪装或验证码绕过。
+- 不增加框架、构建体系、新浏览器依赖、第三方队列、新服务、AI、快照、重做、分支或候选正文缓存。
+- 不扩大为每账号超过 20 条或日期窗口分页；这些必须由第一阶段真实漏斗数据证明后另立任务。
+- 不读取或输出已有 Secret、Cookie、完整手机号、管理链接、Edge 会话文件或原始凭据。
+
+## 验证要求
+
+- Node 测试补齐：计数校验、预算原子预留/释放、实际浏览日、今日实际/预留/剩余汇总、全局单运行、过期不重领、旧回传拒绝、blocked 全局停机与指标归属隔离。
+- Python 测试补齐：全账号候选先汇总、时间/视频预筛、跨账号去重、标题只排序不排除、详情前计数、30 条早停、额度/40 分钟早停以及安全验证归类。
+- 运行原三组 Node 测试、两组 Python 测试、Pages Functions 构建，并在全新临时目录依次应用 `0001`～`0006`。
+- 页面有修改时，用系统 Edge 验收桌面、390px、主导航、键盘焦点和控制台，并更新 `artifacts/school-archive-desktop.png`；页面验收不得访问真实小红书。
+- 自动化测试全部使用模拟数据，不运行真实 Edge 检索或真实 AI。
+
+## 提交与上线边界
+
+按实际结果精简更新 `readme.md`、`handoff.md`、`school-profile-handoff.md`、`AGENTS.md` 和本文件。只暂存本次文件；本地 `main` 提交后再次 fetch 并只读比较，确认可快进才正常推送 `origin/main`。
+
+用户当前授权的是代码优化、验证、提交和正常快进推送。**不包含**生产 D1 `0006` 迁移、Pages 部署、Secret 变更、计划任务恢复/重注册、真实 Edge 检索、真实 AI、旧任务删除或远端删除。代码推送完成后，汇报迁移影响与验证结果，并再次取得用户明确授权再进行生产上线和真实只读验收。

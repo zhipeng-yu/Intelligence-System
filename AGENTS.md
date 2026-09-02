@@ -12,6 +12,8 @@
 
 旧 `Ledu-Xiaohongshu-Course-Trial` 已禁用但未删除；旧 `seen.json`、运行状态和 `held_candidates` 已原样保留，禁用前后文件哈希一致。不得删除历史候选。
 
+用户已要求在下一窗口按 ponytail full 实施网络资料效率、访问预算和任务可观测性优化；当前生产尚未包含这些改动。实施范围、已确认缺口、验证要求和生产授权边界以 `new-window-prompt.md` 为准。新计划任务直接从本工作区运行工作器代码，修改 `automation/` 前必须取得用户同意临时禁用该任务，避免未提交代码被真实调度。
+
 ## 维护边界
 
 - 保留单个原生 `index.html`、Pages Functions、D1、既有 R2、当前 Conda、系统 Edge 和 Windows 任务计划；不增加框架、构建体系、第三方队列、新服务或浏览器依赖。
