@@ -4,7 +4,7 @@
 
 生产地址：<https://ledu-school-archive.pages.dev>
 
-“小规模多用户网络资料 MVP”已部署到生产：Pages 源码提交为 `aed9c23`，远端 D1 已应用到 `0005_add_network_materials.sql`，所需 Secret 已配置。真实 Edge 检索、新工作器计划任务和旧七日任务停用尚未执行。
+“小规模多用户网络资料 MVP”已部署到生产：Pages 源码提交为 `aed9c23`，远端 D1 已应用到 `0005_add_network_materials.sql`，所需 Secret 已配置。真实只读 Edge 检索已验收；新工作器计划任务已注册并完成首次自动运行，旧七日任务已禁用。
 
 ## 登录与权限
 
@@ -38,9 +38,9 @@
 
 `automation/network_worker.py` 复用既有 Conda 环境和锁定提交 `afa96802d3e61cdd5e7bd7b37ec59182bbe07d37` 对应的 `xiaohongshu-skill`，只启动 Windows 系统 Edge；不使用 Chrome、下载版 Chromium、stealth、指纹伪装或验证码绕过。
 
-工作器使用独立 `NETWORK_WORKER_KEY`。任务计划程序每分钟启动一次，每次只认领一个任务，并使用 `MultipleInstances IgnoreNew`。认领采用 30 分钟租约和一次性 claim token，过期可重新认领，相同回传幂等。
+工作器使用独立 `NETWORK_WORKER_KEY`。已注册的任务计划程序每分钟启动一次，每次只认领一个任务，并使用 `MultipleInstances IgnoreNew`。认领采用 30 分钟租约和一次性 claim token，过期可重新认领，相同回传幂等。
 
-旧七日任务尚未停用。只有新功能完成真实生产验收后才停用；停用时保留旧 `seen.json`、运行状态和 `held_candidates`。
+新任务首次自动触发后成功处理 2 个账号的队列任务，状态为 `completed`，无账号失败或安全验证，未命中结果。旧七日任务已禁用但未删除；旧 `seen.json`、运行状态和 `held_candidates` 保持原样。
 
 ## 数据与接口
 

@@ -6,7 +6,7 @@
 
 本轮按 ponytail full 在原架构上增加最小多用户能力：一个原生页面、一个 D1 迁移、三组 Pages Functions 接口和一个本机串行工作器。没有增加框架、构建体系、第三方队列、新服务、短信、密码、R2/PDF 链路、网络资料 AI 或版本系统。
 
-生产部署 `8cc8a54f` 使用源码提交 `aed9c23`，远端 D1 已应用到 `0005`。生产 Secret 已配置，`ADMIN_KEY` 已轮换并随当前部署生效；真实 Edge 检索与新工作器计划任务尚未执行。
+生产部署 `8cc8a54f` 使用源码提交 `aed9c23`，远端 D1 已应用到 `0005`。生产 Secret 已配置，`ADMIN_KEY` 已轮换并随当前部署生效；真实只读 Edge 检索已验收，新工作器计划任务已注册并完成首次自动运行。
 
 ## 学校资料兼容
 
@@ -43,7 +43,7 @@ users
 
 `automation/network_worker.py` 复用既有 Conda 与固定版 `xiaohongshu-skill`，通过 `edge_client_type(PROFILE_PATH)` 使用独立的系统 Edge profile。关闭浏览器时清除专用 profile 的 History/Sessions 文件，保留登录所需站点存储，避免把含临时参数的访问记录长期留存。
 
-任务计划每分钟启动一次，`MultipleInstances IgnoreNew`，每次只认领一个任务。API 用独立工作器密钥、30 分钟租约和 claim token 控制认领与回传；同一 payload 可安全重复提交。
+已注册的任务计划每分钟启动一次，`MultipleInstances IgnoreNew`，每次只认领一个任务。API 用独立工作器密钥、30 分钟租约和 claim token 控制认领与回传；同一 payload 可安全重复提交。注册脚本保持纯 ASCII，以兼容 Windows PowerShell 5.1 对无 BOM 脚本的读取方式。
 
 工作器串行核验账号主页，只取最近 20 条候选，先按主页发布时间排除窗口外内容，再打开详情；主页和详情两层均排除视频。标题与公开文案使用 NFKC、小写和空白归一化后做 AND 匹配，摘要由明确事实确定性拼接，不使用 AI。
 
@@ -53,4 +53,4 @@ users
 
 本轮已通过三组 Node 测试、两组 Python 测试、全新本地 `0001`～`0005` 迁移、Pages Functions 构建，以及系统 Edge 桌面/390px/键盘/控制台验收。`artifacts/school-archive-desktop.png` 已更新为只显示八张学校卡片的登录后页面。
 
-自动化测试不访问真实小红书、不调用真实 AI。生产迁移、Secret 和 Pages 部署已完成；真实 Edge 检索、新工作器计划任务和旧任务停用仍未执行，剩余步骤见 `handoff.md`。
+自动化测试不访问真实小红书、不调用真实 AI。真实只读验收任务与新计划任务首次自动触发均为 `completed`，无安全验证；首次自动任务处理 2 个账号，0 条命中、0 个失败。旧七日任务已禁用但未删除，旧状态、`seen.json` 和 `held_candidates` 保持原样。生产迁移、Secret、Pages 部署及本机上线收尾均已完成。

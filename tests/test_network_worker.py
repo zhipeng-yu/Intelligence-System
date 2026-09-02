@@ -125,6 +125,7 @@ class NetworkWorkerTest(unittest.TestCase):
         self.assertIn("feeds[:20]", source)
         self.assertNotIn("playwright install", inspect.getsource(network_worker))
         schedule = Path("automation/register_network_worker.ps1").read_text(encoding="utf-8")
+        self.assertTrue(schedule.isascii())
         self.assertIn("New-TimeSpan -Minutes 1", schedule)
         self.assertIn("MultipleInstances IgnoreNew", schedule)
         self.assertIn("-m automation.network_worker run", schedule)

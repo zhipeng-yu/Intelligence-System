@@ -8,9 +8,9 @@
 
 ## 当前状态
 
-小规模多用户网络资料 MVP 已部署；生产部署 `8cc8a54f` 运行源码 `aed9c23`，远端 D1 已到 `0005_add_network_materials.sql`，所需 Secret 已配置。`ADMIN_KEY` 已于 2026-09-02 轮换并随当前部署生效；生产有 1 个 `queued` 检索任务，真实 Edge 检索、新工作器计划任务和旧七日任务停用尚未执行。
+小规模多用户网络资料 MVP 已部署；生产部署 `8cc8a54f` 运行源码 `aed9c23`，远端 D1 已到 `0005_add_network_materials.sql`，所需 Secret 已配置。`ADMIN_KEY` 已于 2026-09-02 轮换并随当前部署生效。真实只读 Edge 检索已验收；`Ledu-Network-Materials-Worker` 已注册为每分钟 `IgnoreNew` 并完成首次自动运行，2 个账号的任务为 `completed`、0 条结果、0 个失败且未停机。
 
-旧七日任务只有在新功能真实验收后才能停用。停用时保留旧 `seen.json`、运行状态和 `held_candidates`，不删除历史候选。
+旧 `Ledu-Xiaohongshu-Course-Trial` 已禁用但未删除；旧 `seen.json`、运行状态和 `held_candidates` 已原样保留，禁用前后文件哈希一致。不得删除历史候选。
 
 ## 维护边界
 

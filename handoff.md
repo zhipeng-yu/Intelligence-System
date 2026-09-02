@@ -6,8 +6,9 @@
 
 - “小规模多用户网络资料 MVP”已部署到 <https://ledu-school-archive.pages.dev>；当前生产部署 `8cc8a54f` 使用源码提交 `aed9c23`，远端 D1 已应用到 `0005_add_network_materials.sql`。
 - 所需生产 Secret 已配置；`ADMIN_KEY` 于 2026-09-02 完成轮换并随当前部署生效，旧的标准域名管理员链接已经失效。秘密与新管理链接均未写入仓库或文档。
-- 生产现有 1 个 `queued` 网络检索任务。尚未执行真实 Edge 检索，也未注册 `Ledu-Network-Materials-Worker` 计划任务。
-- 旧 `Ledu-Xiaohongshu-Course-Trial` 任务仍为 `Ready`。新功能真实验收后才能停用，并须保留旧 `seen.json`、状态文件和 `held_candidates`。
+- 真实只读 Edge 检索已验收；验收任务为 `completed`，无账号失败、安全验证或结果命中。
+- `Ledu-Network-Materials-Worker` 已注册并核验为每分钟触发、`MultipleInstances IgnoreNew`、全局串行。首次自动触发成功处理 2 个账号的队列任务，状态为 `completed`，0 条结果、0 个失败，工作器未停机。
+- 旧 `Ledu-Xiaohongshu-Course-Trial` 已禁用但未删除；旧 `seen.json`、状态文件和其中的 `held_candidates` 原样保留，禁用前后文件哈希一致。
 - 现有生产 D1、私有 R2、Workers AI 与方舟闭环保持原状。秘密和管理链接不得进入 Git、聊天、日志、截图或普通文档。
 
 ## 新源码结构
@@ -18,6 +19,7 @@
 - `0005_add_network_materials.sql` 仅新增五张表：`users`、`sessions`、`watched_accounts`、`network_search_jobs`、`network_search_results`。
 - 一个本机串行工作器使用系统 Edge 和独立 `NETWORK_WORKER_KEY`，每账号最多读取最近 20 条主页候选，但只打开时间窗口内的图文详情；每任务最多保存 30 条结果。
 - 工作器不下载媒体、不保存完整文案或临时 token、不调用 AI；验证码、登录失效或安全验证会停止并等待人工显式恢复。
+- 任务注册脚本保持纯 ASCII，避免无 BOM UTF-8 在 Windows PowerShell 5.1 中被系统代码页误解析。
 
 ## 权限与配额
 
@@ -38,15 +40,12 @@
 - 全新临时 D1 依次应用 `0001`～`0005` 成功。
 - Pages Functions 构建成功。
 - 系统 Edge 完成登录后主流程、8 张学校卡片、网络账号/检索、桌面布局、390px、移动端主导航、键盘焦点和控制台验收；控制台无错误，截图已更新。
+- 专用系统 Edge 完成一次人工授权的真实只读检索；随后新计划任务完成首次自动触发。两次均无安全验证，任务均为 `completed`。
 
 测试均使用模拟数据，不访问真实小红书、不调用真实 AI，也没有读取现有 Secret、Cookie 或 Edge 会话文件。
 
-## 剩余上线动作
+## 当前运维状态
 
-以下动作仍须获得明确授权：
-
-1. 使用新管理员链接复核管理模式。
-2. 在专用系统 Edge 会话中完成一次只读真实检索，处理现有 `queued` 任务。
-3. 验收成功后注册新的一分钟 `IgnoreNew` 任务并停用旧七日任务，保留旧状态与候选文件。
-
-生产命令只在获得授权后执行。禁止强推；认证失败、冲突、非快进或未知远端提交时立即停止。
+- 上线收尾已完成；新工作器按分钟处理用户主动提交的队列任务，空队列时直接退出。
+- 若任务因验证码、登录失效或安全验证变为 `blocked`，只运行 `repair-login` 由用户人工处理并显式恢复，禁止自动重试或绕过。
+- 管理模式链接复核不在本次范围内，本次未读取或输出任何管理链接。禁止强推；认证失败、冲突、非快进或未知远端提交时立即停止。
