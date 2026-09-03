@@ -33,7 +33,7 @@ export const onRequestPost = withDatabase(async ({ request, env, params }) => {
   if (!claimToken || claimToken.length > 100) return json({ error: '任务租约无效。' }, 409);
   const job = await env.DB.prepare(`
     SELECT id, user_id, accounts_json, window_start_at, created_at, status,
-      lease_expires_at, claim_token_hash, result_payload_hash
+      lease_expires_at, claim_token_hash, result_payload_hash, detail_budget
     FROM network_search_jobs WHERE id = ?1
   `).bind(params.id).first();
   if (!job || !job.claim_token_hash
@@ -46,6 +46,11 @@ export const onRequestPost = withDatabase(async ({ request, env, params }) => {
   const payloadHash = await sha256Hex(serialized);
   if (ENDED_STATUSES.has(job.status)) {
     if (job.result_payload_hash !== payloadHash) return json({ error: '任务已经结束。' }, 409);
+    if (job.status === 'blocked') await env.DB.prepare(`
+      UPDATE network_worker_control
+      SET halted = 1, halt_reason = 'security_blocked', updated_at = ?1
+      WHERE id = 1
+    `).bind(new Date().toISOString()).run();
     await materialize(env, job, payload);
     return json({ id: job.id, status: job.status, idempotent: true });
   }
@@ -53,16 +58,39 @@ export const onRequestPost = withDatabase(async ({ request, env, params }) => {
     return json({ error: '任务租约已过期。' }, 409);
   }
   const completedAt = new Date().toISOString();
-  const update = await env.DB.prepare(`
+  const updateStatement = env.DB.prepare(`
     UPDATE network_search_jobs
     SET status = ?1, completed_at = ?2, error_detail = ?3, failures_json = ?4,
-        result_payload_hash = ?5, result_payload_json = ?6, lease_expires_at = NULL
-    WHERE id = ?7 AND status = 'running' AND claim_token_hash = ?8
+        result_payload_hash = ?5, result_payload_json = ?6, lease_expires_at = NULL,
+        homepage_candidates = ?7, eligible_candidates = ?8, detail_opens = ?9,
+        keyword_checks = ?10, matched_results = ?11, termination_reason = ?12,
+        counts_complete = 1
+    WHERE id = ?13 AND status = 'running' AND claim_token_hash = ?14
       AND lease_expires_at > ?2 AND result_payload_hash IS NULL
   `).bind(
     payload.status, completedAt, payload.error_detail, JSON.stringify(payload.failures),
-    payloadHash, serialized, job.id, job.claim_token_hash
-  ).run();
+    payloadHash, serialized, payload.homepage_candidates, payload.eligible_candidates,
+    payload.detail_opens, payload.keyword_checks, payload.matched_results,
+    payload.termination_reason, job.id, job.claim_token_hash
+  );
+  let update;
+  if (payload.status === 'blocked') {
+    const [, jobUpdate] = await env.DB.batch([
+      env.DB.prepare(`
+        UPDATE network_worker_control
+        SET halted = 1, halt_reason = 'security_blocked', updated_at = ?1
+        WHERE id = 1 AND EXISTS (
+          SELECT 1 FROM network_search_jobs
+          WHERE id = ?2 AND status = 'running' AND claim_token_hash = ?3
+            AND lease_expires_at > ?1 AND result_payload_hash IS NULL
+        )
+      `).bind(completedAt, job.id, job.claim_token_hash),
+      updateStatement
+    ]);
+    update = jobUpdate;
+  } else {
+    update = await updateStatement.run();
+  }
   if (!update.meta.changes) return json({ error: '任务租约已失效。' }, 409);
   await materialize(env, job, payload);
   return json({ id: job.id, status: payload.status, idempotent: false });

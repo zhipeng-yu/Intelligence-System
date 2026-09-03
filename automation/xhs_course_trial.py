@@ -238,6 +238,25 @@ def edge_client_type(profile_path: Path = PROFILE_PATH):
             if self._check_captcha():
                 raise StopTrial("security", "小红书要求验证，需在 Edge 中人工处理")
 
+        def wait_for_initial_state(self, timeout: int = 30000, retries: int = 2):
+            def login_required():
+                url = (self.page.url or "").lower()
+                login = self.page.locator(".login-container .qrcode-img")
+                return "/login" in url or (login.count() and login.first.is_visible())
+
+            if login_required():
+                raise StopTrial("login", "小红书登录已失效，需在 Edge 中人工处理")
+            try:
+                super().wait_for_initial_state(timeout=timeout, retries=retries)
+            except Exception as error:
+                if error.__class__.__name__ == "CaptchaError" or self._check_captcha():
+                    raise StopTrial("security", "小红书要求验证，需在 Edge 中人工处理") from error
+                raise
+            if login_required():
+                raise StopTrial("login", "小红书登录已失效，需在 Edge 中人工处理")
+            if self._check_captcha():
+                raise StopTrial("security", "小红书要求验证，需在 Edge 中人工处理")
+
     return EdgeClient, feed_action, login_action, user_action
 
 

@@ -12,7 +12,7 @@
 
 旧 `Ledu-Xiaohongshu-Course-Trial` 已禁用但未删除；旧 `seen.json`、运行状态和 `held_candidates` 已原样保留，禁用前后文件哈希一致。不得删除历史候选。
 
-用户已要求在下一窗口按 ponytail full 实施网络资料效率、访问预算和任务可观测性优化；当前生产尚未包含这些改动。实施范围、已确认缺口、验证要求和生产授权边界以 `new-window-prompt.md` 为准。新计划任务直接从本工作区运行工作器代码，修改 `automation/` 前必须取得用户同意临时禁用该任务，避免未提交代码被真实调度。
+网络资料效率、访问预算和任务可观测性优化已在源码中实现，新增迁移为 `0006_add_network_budget_metrics.sql`；当前生产尚未包含这些改动。`Ledu-Network-Materials-Worker` 已获用户授权临时禁用并保持 `Disabled`，不得自行恢复或重注册。实现、验证状态和生产授权边界以 `new-window-prompt.md` 为准。
 
 ## 维护边界
 
@@ -30,10 +30,10 @@
 
 ## 验证与发布
 
-- 至少运行三组 Node 测试、两组 Python 测试、Pages Functions 构建和全新本地 `0001`～`0005` 迁移。
-- 页面修改使用系统 Edge 检查主要流程、390px、主导航、键盘焦点和控制台，并更新 `artifacts/school-archive-desktop.png`。
+- 至少运行三组 Node 测试、两组 Python 测试、Pages Functions 构建和全新本地 `0001`～`0006` 迁移。
+- 页面修改使用 GPT 内置浏览器检查主要流程、390px、主导航、键盘焦点和控制台，并更新 `artifacts/school-archive-desktop.png`。
 - 只暂存本次文件；提交本地 `main` 后再次 fetch 并只读比较，再正常推送 `origin/main`。冲突、认证失败、非快进或未知远端变化立即停止。
-- 推送代码不授权生产 D1、Secret、Pages 部署、真实 Edge 检索、真实 AI、旧任务停用或远端删除。
+- 推送代码不授权生产 D1、Secret、Pages 部署、计划任务恢复/重注册、真实 Edge 检索、真实 AI、旧任务删除或远端删除。
 
 ## 每次任务收尾
 

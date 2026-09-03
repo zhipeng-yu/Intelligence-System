@@ -1,9 +1,13 @@
 import { json, withUser } from '../../../_shared.js';
-import { normalizedKeywords, parseArray, shanghaiDayBounds } from '../_shared.js';
+import {
+  DETAIL_DAILY_LIMIT, normalizedKeywords, parseArray, shanghaiDate, shanghaiDayBounds
+} from '../_shared.js';
 
 const JOB_COLUMNS = `
   id, keywords_json, accounts_json, days, window_start_at, created_at,
-  status, completed_at, error_detail, failures_json
+  status, completed_at, error_detail, failures_json, detail_budget,
+  homepage_candidates, eligible_candidates, detail_opens, keyword_checks,
+  matched_results, termination_reason, counts_complete, budget_date
 `;
 
 function publicJob(row) {
@@ -18,12 +22,22 @@ function publicJob(row) {
     completed_at: row.completed_at,
     error_detail: row.error_detail,
     failures: parseArray(row.failures_json),
+    detail_budget: row.detail_budget,
+    homepage_candidates: row.homepage_candidates,
+    eligible_candidates: row.eligible_candidates,
+    detail_opens: row.detail_opens,
+    keyword_checks: row.keyword_checks,
+    matched_results: row.matched_results,
+    termination_reason: row.termination_reason,
+    counts_complete: Boolean(row.counts_complete),
+    budget_date: row.budget_date,
     results: []
   };
 }
 
 export const onRequestGet = withUser(async ({ env, user }) => {
-  const [{ results: jobs }, { results }] = await Promise.all([
+  const today = shanghaiDate();
+  const [{ results: jobs }, { results }, budgetRow] = await Promise.all([
     env.DB.prepare(`
       SELECT ${JOB_COLUMNS}
       FROM network_search_jobs
@@ -45,12 +59,32 @@ export const onRequestGet = withUser(async ({ env, user }) => {
       JOIN network_search_jobs AS job ON job.id = result.job_id
       WHERE job.user_id = ?1
       ORDER BY result.published_at DESC, result.id
-    `).bind(user.id).all()
+    `).bind(user.id).all(),
+    env.DB.prepare(`
+      SELECT
+        COALESCE(SUM(CASE WHEN counts_complete = 1 THEN detail_opens ELSE 0 END), 0) AS actual,
+        COALESCE(SUM(CASE WHEN counts_complete = 0 THEN detail_budget ELSE 0 END), 0) AS reserved,
+        MAX(CASE WHEN counts_complete = 0 AND detail_budget > 0 THEN 1 ELSE 0 END) AS incomplete
+      FROM network_search_jobs
+      WHERE budget_date = ?1
+    `).bind(today).first()
   ]);
   const values = (jobs || []).map(publicJob);
   const byId = new Map(values.map(job => [job.id, job]));
   for (const result of results || []) byId.get(result.job_id)?.results.push(result);
-  return json({ searches: values });
+  const actual = Number(budgetRow?.actual || 0);
+  const reserved = Number(budgetRow?.reserved || 0);
+  return json({
+    searches: values,
+    budget: {
+      date: today,
+      limit: DETAIL_DAILY_LIMIT,
+      actual,
+      reserved,
+      remaining: Math.max(0, DETAIL_DAILY_LIMIT - actual - reserved),
+      incomplete: Boolean(budgetRow?.incomplete)
+    }
+  });
 });
 
 export const onRequestPost = withUser(async ({ request, env, user }) => {
@@ -108,6 +142,8 @@ export const onRequestPost = withUser(async ({ request, env, user }) => {
   return json({ search: {
     id, keywords, accounts, days, window_start_at: windowStart,
     created_at: createdAt.toISOString(), status: 'queued', completed_at: null,
-    error_detail: null, failures: [], results: []
+    error_detail: null, failures: [], detail_budget: 0, homepage_candidates: 0,
+    eligible_candidates: 0, detail_opens: 0, keyword_checks: 0, matched_results: 0,
+    termination_reason: null, counts_complete: false, budget_date: null, results: []
   } }, 201);
 });

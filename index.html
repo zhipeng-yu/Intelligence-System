@@ -132,6 +132,7 @@
     .completion { min-width: 220px; align-self: center; padding: 17px 18px; border: 1px solid rgba(255, 255, 255, .2); }
     .completion span { display: block; color: rgba(255, 255, 255, .55); font-size: 10px; letter-spacing: .12em; }
     .completion strong { display: block; margin-top: 7px; color: var(--yellow); font: 700 20px/1.3 var(--display); }
+    .completion .budget-detail { margin-top: 5px; letter-spacing: 0; }
 
     .section { margin-top: 46px; scroll-margin-top: 20px; }
     .section-heading { margin-bottom: 17px; }
@@ -383,7 +384,7 @@
         <section aria-labelledby="network-title">
           <div class="summary">
             <div class="summary-copy"><span class="eyebrow">NETWORK MATERIALS</span><h2 id="network-title">网络资料</h2><p>只读取你关注账号的公开图文；关键词采用 AND 匹配，不保存完整文案或媒体。</p></div>
-            <div class="completion"><span>检索范围</span><strong>近 1 / 3 / 7 日</strong></div>
+            <div class="completion" aria-live="polite"><span>今日实际打开详情</span><strong id="networkBudgetText">0 / 180</strong><span class="budget-detail" id="networkBudgetDetail">当前预留 0 · 今日剩余 180</span></div>
           </div>
         </section>
         <div class="split-grid section">
@@ -440,6 +441,7 @@
     let turnstileReady = null;
     let accounts = [];
     let searches = [];
+    let networkBudget = { limit: 180, actual: 0, reserved: 0, remaining: 180 };
 
     try {
       adminKey = urlKey || localStorage.getItem(STORAGE_KEY) || '';
@@ -472,6 +474,8 @@
     const accountMessage = document.querySelector('#accountMessage');
     const searchList = document.querySelector('#searchList');
     const searchMessage = document.querySelector('#searchMessage');
+    const networkBudgetText = document.querySelector('#networkBudgetText');
+    const networkBudgetDetail = document.querySelector('#networkBudgetDetail');
     const adminUsers = document.querySelector('#adminUsers');
     const adminUserList = document.querySelector('#adminUserList');
     const adminMessage = document.querySelector('#adminMessage');
@@ -653,6 +657,8 @@
     }
 
     function renderSearches() {
+      networkBudgetText.textContent = `${networkBudget.actual} / ${networkBudget.limit}`;
+      networkBudgetDetail.textContent = `当前预留 ${networkBudget.reserved} · 今日剩余 ${networkBudget.remaining}`;
       if (!searches.length) {
         searchList.replaceChildren(node('div', '暂无检索任务。', 'empty-state'));
         return;
@@ -661,12 +667,35 @@
         queued: '排队中', running: '检索中', completed: '已完成', partial: '部分完成',
         blocked: '已阻断', failed: '失败'
       };
+      const terminationLabels = {
+        results_cap: '达到 30 条结果', detail_budget_exhausted: '任务额度用尽',
+        runtime_cutoff: '达到 40 分钟截止', security_blocked: '安全验证阻断',
+        candidates_exhausted: '候选耗尽', worker_failed: '工作器失败',
+        lease_expired: '租约过期', legacy_unreported: '旧任务未记录'
+      };
       searchList.replaceChildren(...searches.map(item => {
         const row = node('article', '', 'update-row');
         const copy = node('div', '', 'update-copy');
         copy.append(node('strong', item.keywords.join(' AND ')));
         copy.append(node('span', `${formatDate(item.created_at)} · 近 ${item.days} 日 · ${item.accounts.length} 个账号`, 'update-meta'));
         copy.append(node('span', labels[item.status] || item.status, `status ${item.status}`));
+        if (['completed', 'partial', 'blocked', 'failed'].includes(item.status)) {
+          const value = key => item.counts_complete ? item[key] : '未完整';
+          copy.append(node('span', [
+            `主页候选 ${value('homepage_candidates')}`,
+            `初筛剩余 ${value('eligible_candidates')}`,
+            `详情打开 ${value('detail_opens')}`,
+            `关键词检查 ${value('keyword_checks')}`,
+            `命中 ${value('matched_results')}`,
+            `停止：${terminationLabels[item.termination_reason] || item.termination_reason || '未记录'}`
+          ].join(' · '), 'update-meta'));
+          if (!item.counts_complete) copy.append(node(
+            'p', item.budget_date
+              ? `实际统计未完整上报；保守占用预留额度 ${item.detail_budget}。`
+              : '旧任务没有可用的漏斗统计。',
+            'notice error'
+          ));
+        }
         if (item.error_detail) copy.append(node('p', item.error_detail, 'notice error'));
         if (item.failures.length) {
           const failures = node('ul', '', 'failure-list');
@@ -717,6 +746,7 @@
       const [accountData, searchData] = await Promise.all([accountResponse.json(), searchResponse.json()]);
       accounts = accountData.accounts || [];
       searches = searchData.searches || [];
+      networkBudget = searchData.budget || networkBudget;
       renderAccounts();
       renderSearches();
     }
@@ -925,6 +955,7 @@
       profile = null;
       accounts = [];
       searches = [];
+      networkBudget = { limit: 180, actual: 0, reserved: 0, remaining: 180 };
       isAdmin = false;
       await showLogin();
     });

@@ -4,7 +4,7 @@
 
 生产地址：<https://ledu-school-archive.pages.dev>
 
-“小规模多用户网络资料 MVP”已部署到生产：Pages 源码提交为 `aed9c23`，远端 D1 已应用到 `0005_add_network_materials.sql`，所需 Secret 已配置。真实只读 Edge 检索已验收；新工作器计划任务已注册并完成首次自动运行，旧七日任务已禁用。
+“小规模多用户网络资料 MVP”已部署到生产：Pages 源码提交为 `aed9c23`，远端 D1 已应用到 `0005_add_network_materials.sql`，所需 Secret 已配置。真实只读 Edge 检索已验收；旧七日任务已禁用。访问预算优化已在源码中完成但尚未部署，`Ledu-Network-Materials-Worker` 当前保持禁用，等待生产迁移与部署授权。
 
 ## 登录与权限
 
@@ -27,10 +27,10 @@
 
 - 每人最多保存 3 个 24 位十六进制小红书账号 ID；不接受昵称或链接。
 - 每次输入 1～2 个关键词并选择近 1、3 或 7 日。标题与公开文案规范化后必须同时包含全部关键词。
-- 一个全局串行工作器按账号读取主页，每账号最多检查最近 20 条图文；先按主页发布时间排除窗口外内容，再打开详情，主页和详情阶段都排除视频，不下载媒体。
+- 一个全局串行工作器先汇总每账号最多 20 条主页候选，排除视频、窗口外内容、无效 ID 和缺少当前会话临时参数的候选，再跨账号去重并按标题关键词命中数、发布时间安排详情顺序。标题未命中只后移，不直接排除。
 - 每次最多保存 30 条，按发布时间倒序展示账号名、发布日期、标题、干净公开链接和 100～200 字确定性摘要。
 - 不保存完整文案、媒体、评论、用户资料或临时 token，也不调用 AI。
-- 每人每天最多 3 次，全站每天最多 20 次，每人最多一个活动任务；日期按 Asia/Shanghai 计算，检索窗口固定在任务创建时刻。
+- 每人每天最多 3 次，全站每天最多 20 次，每人最多一个活动任务；日期按 Asia/Shanghai 计算，检索窗口固定在任务创建时刻。工作器按实际认领日共享 `180` 次详情预算，认领前按账号数 × 20 原子预留，结束后收敛为实际打开数。
 - 保留每人最近 10 个已结束任务。用户只能查看和删除自己的账号、任务及结果；删除任务级联删除结果。
 - 单账号失败标记 `partial` 并保留其他结果。验证码、登录失效或安全验证会标记 `blocked`、停止后续认领并等待人工显式恢复。
 
@@ -38,15 +38,15 @@
 
 `automation/network_worker.py` 复用既有 Conda 环境和锁定提交 `afa96802d3e61cdd5e7bd7b37ec59182bbe07d37` 对应的 `xiaohongshu-skill`，只启动 Windows 系统 Edge；不使用 Chrome、下载版 Chromium、stealth、指纹伪装或验证码绕过。
 
-工作器使用独立 `NETWORK_WORKER_KEY`。已注册的任务计划程序每分钟启动一次，每次只认领一个任务，并使用 `MultipleInstances IgnoreNew`。认领采用 30 分钟租约和一次性 claim token，过期可重新认领，相同回传幂等。
+工作器使用独立 `NETWORK_WORKER_KEY`。服务端保证全局最多一个运行任务；认领采用 50 分钟租约和一次性 claim token，工作器在 40 分钟后不再开始新的详情访问。过期任务直接结束为 `lease_expired`，不再自动从头重跑；相同回传仍幂等。
 
-新任务首次自动触发后成功处理 2 个账号的队列任务，状态为 `completed`，无账号失败或安全验证，未命中结果。旧七日任务已禁用但未删除；旧 `seen.json`、运行状态和 `held_candidates` 保持原样。
+新任务首次自动触发后成功处理 2 个账号的队列任务，状态为 `completed`，无账号失败或安全验证，未命中结果。旧七日任务已禁用但未删除；旧 `seen.json`、运行状态和 `held_candidates` 保持原样。访问预算改动期间，新工作器计划任务已按用户授权临时禁用，完成代码验证后也不得自行恢复。
 
-当前版本按任务数限流，但尚未持久化主页候选、详情打开和关键词检查漏斗；30 分钟租约也短于本机 45 分钟执行上限，过期任务可重新认领。用户已批准下一窗口实施最小优化：全账号候选先汇总、标题只用于详情优先级、30 条早停、任务/每日详情预算、过期不自动重跑、服务端全局串行和聚合指标展示。完成后页面应同时显示单任务详情打开数，以及按实际执行日计算的今日详情实际值、预留值和剩余额度。该优化尚未部署，详见 `new-window-prompt.md`。
+验证码、登录失效或安全验证会同时写入 D1 全局停机状态和本地停机状态；只有人工 `repair-login` 成功后才显式恢复。页面显示每个结束任务的主页候选、初筛剩余、详情打开、关键词检查、命中和停止原因，并显示今日实际、预留与剩余额度；统计不完整的过期任务保留完整预留且明确标注。为避免删除任务抹掉当天预算，已占用当日预算的任务次日才允许删除。
 
 ## 数据与接口
 
-`0005_add_network_materials.sql` 只新增 `users`、`sessions`、`watched_accounts`、`network_search_jobs`、`network_search_results`。任务状态固定为 `queued`、`running`、`completed`、`partial`、`blocked`、`failed`。
+`0005_add_network_materials.sql` 新增 `users`、`sessions`、`watched_accounts`、`network_search_jobs`、`network_search_results`。`0006_add_network_budget_metrics.sql` 为任务表增加预算日、预留额度、漏斗计数、停止原因和计数完整性，并增加单行全局停机控制表；不保存正文、媒体、评论、用户资料或临时 token。任务状态仍固定为 `queued`、`running`、`completed`、`partial`、`blocked`、`failed`。
 
 新增接口仅包括认证、管理员白名单、关注账号、检索任务以及工作器认领/回传，代码位于 `functions/api/auth/`、`functions/api/admin/` 和 `functions/api/network/`。
 
@@ -64,6 +64,6 @@ npx.cmd wrangler d1 migrations apply ledu-school-archive --local --persist-to .w
 npx.cmd wrangler pages functions build
 ```
 
-测试使用模拟响应，不访问真实小红书或调用真实 AI。桌面系统 Edge、390px、键盘焦点、主流程和控制台错误已验收，截图见 `artifacts/school-archive-desktop.png`。
+测试使用模拟响应，不访问真实小红书或调用真实 AI。GPT 内置浏览器已完成 1280px 桌面、390px、键盘焦点、主导航和控制台验收；控制台无错误，截图见 `artifacts/school-archive-desktop.png`。
 
 代码仓库：<https://github.com/zhipeng-yu/Intelligence-System>

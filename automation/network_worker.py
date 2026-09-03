@@ -41,6 +41,8 @@ CREDENTIAL_PATH = ROOT / "worker-key.bin"
 PROFILE_PATH = ROOT / "edge-profile"
 REGISTER_SCRIPT = Path(__file__).with_name("register_network_worker.ps1")
 TASK_NAME = "Ledu-Network-Materials-Worker"
+MAX_RESULTS = 30
+MAX_RUNTIME_SECONDS = 40 * 60
 
 
 class WorkerBlocked(RuntimeError):
@@ -189,54 +191,152 @@ def profile_feeds(client, user_action, account_id: str) -> tuple[str, list[dict]
     return account_name or account_id, feeds
 
 
-def collect_account(client, feed_action, user_action, account_id: str, job: dict) -> list[dict]:
-    account_name, feeds = profile_feeds(client, user_action, account_id)
-    window_start = datetime.fromisoformat(job["window_start_at"].replace("Z", "+00:00")).astimezone(CHINA_TZ)
-    window_end = datetime.fromisoformat(job["created_at"].replace("Z", "+00:00")).astimezone(CHINA_TZ)
-    action = feed_action(client)
-    results = []
-    for feed in feeds[:20]:
-        if is_video(feed):
-            continue
-        published_at = datetime.fromtimestamp(feed_timestamp(feed), CHINA_TZ)
-        if published_at < window_start or published_at > window_end:
-            continue
-        note_id = str(feed.get("id", ""))
-        token = text_value(feed.get("xsecToken"))
-        if not re.fullmatch(r"[0-9a-f]{24}", note_id) or not token:
-            continue
-        detail = safe_feed_detail(action, client, note_id, token)
-        if not detail:
-            continue
-        result = detail_result(
-            account_id, account_name, note_id, detail, job["keywords"], window_start, window_end
-        )
-        if result:
-            results.append(result)
-    return results
-
-
-def process_job(job: dict, reader: Callable[[str, dict], list[dict]]) -> dict:
-    results = []
-    failures = []
-    for account_id in job["accounts"]:
-        try:
-            results.extend(reader(account_id, job))
-        except WorkerBlocked:
-            raise
-        except StopTrial as error:
-            raise WorkerBlocked(str(error)) from error
-        except Exception as error:
-            reason = re.sub(r"\s+", " ", str(error)).strip()[:200] or "账号读取失败"
-            failures.append({"account_id": account_id, "reason": reason})
-    unique = {item["url"]: item for item in results}
-    ordered = sorted(unique.values(), key=lambda item: (item["published_at"], item["url"]), reverse=True)[:30]
+def _metrics() -> dict:
     return {
-        "status": "partial" if failures else "completed",
+        "homepage_candidates": 0,
+        "eligible_candidates": 0,
+        "detail_opens": 0,
+        "keyword_checks": 0,
+        "matched_results": 0,
+    }
+
+
+def _payload(status: str, results: list[dict], failures: list[dict], metrics: dict,
+             termination_reason: str, error_detail: str | None = None) -> dict:
+    unique = {item["url"]: item for item in results}
+    ordered = sorted(
+        unique.values(), key=lambda item: (item["published_at"], item["url"]), reverse=True
+    )[:MAX_RESULTS]
+    metrics["matched_results"] = len(ordered)
+    return {
+        "status": status,
         "results": ordered,
         "failures": failures,
-        "error_detail": "部分账号读取失败，已保留其他账号结果。" if failures else None,
+        "error_detail": error_detail,
+        "termination_reason": termination_reason,
+        **metrics,
     }
+
+
+def _failure(failures: list[dict], account_id: str, error: Exception) -> None:
+    if any(item["account_id"] == account_id for item in failures):
+        return
+    reason = re.sub(r"\s+", " ", str(error)).strip()[:200] or "账号读取失败"
+    failures.append({"account_id": account_id, "reason": reason})
+
+
+def process_job(job: dict, account_reader: Callable[[str, dict], tuple[str, list[dict]]],
+                detail_reader: Callable[[dict], dict | None], *,
+                clock: Callable[[], float] = time.monotonic,
+                started_at: float | None = None) -> dict:
+    started_at = clock() if started_at is None else started_at
+    window_start = datetime.fromisoformat(job["window_start_at"].replace("Z", "+00:00")).astimezone(CHINA_TZ)
+    window_end = datetime.fromisoformat(job["created_at"].replace("Z", "+00:00")).astimezone(CHINA_TZ)
+    metrics = _metrics()
+    candidates = []
+    results = []
+    failures: list[dict] = []
+    failed_accounts = set()
+    try:
+        for account_id in job["accounts"]:
+            try:
+                account_name, feeds = account_reader(account_id, job)
+            except WorkerBlocked:
+                raise
+            except StopTrial as error:
+                raise WorkerBlocked(str(error)) from error
+            except Exception as error:
+                failed_accounts.add(account_id)
+                _failure(failures, account_id, error)
+                continue
+            homepage = [feed for feed in feeds[:20] if isinstance(feed, dict)]
+            metrics["homepage_candidates"] += len(homepage)
+            for feed in homepage:
+                if is_video(feed):
+                    continue
+                published = feed_timestamp(feed)
+                published_at = datetime.fromtimestamp(published, CHINA_TZ)
+                note_id = str(feed.get("id", ""))
+                token = text_value(feed.get("xsecToken"))
+                if (published_at < window_start or published_at > window_end
+                        or not re.fullmatch(r"[0-9a-f]{24}", note_id) or not token):
+                    continue
+                card = feed.get("noteCard") if isinstance(feed.get("noteCard"), dict) else {}
+                title = text_value(card.get("displayTitle") or card.get("title"))
+                normalized_title = normalize_text(title)
+                candidates.append({
+                    "account_id": account_id,
+                    "account_name": account_name,
+                    "note_id": note_id,
+                    "token": token,
+                    "published": published,
+                    "title_hits": sum(normalize_text(keyword) in normalized_title for keyword in job["keywords"]),
+                })
+
+        unique_candidates = {}
+        for candidate in candidates:
+            current = unique_candidates.get(candidate["note_id"])
+            if current is None or (candidate["title_hits"], candidate["published"]) > (
+                    current["title_hits"], current["published"]):
+                unique_candidates[candidate["note_id"]] = candidate
+        candidates = sorted(
+            unique_candidates.values(),
+            key=lambda item: (-item["title_hits"], -item["published"], item["note_id"]),
+        )
+        metrics["eligible_candidates"] = len(candidates)
+        budget = int(job.get("detail_budget") or 0)
+        termination_reason = "candidates_exhausted"
+        for candidate in candidates:
+            if len(results) >= MAX_RESULTS:
+                termination_reason = "results_cap"
+                break
+            if metrics["detail_opens"] >= budget:
+                termination_reason = "detail_budget_exhausted"
+                break
+            if clock() - started_at >= MAX_RUNTIME_SECONDS:
+                termination_reason = "runtime_cutoff"
+                break
+            if candidate["account_id"] in failed_accounts:
+                continue
+            metrics["detail_opens"] += 1
+            try:
+                detail = detail_reader(candidate)
+                if not isinstance(detail, dict) or is_video(detail):
+                    continue
+                title, _description, published = note_text(detail)
+                if not title or not published:
+                    continue
+                detail_published = datetime.fromtimestamp(published, CHINA_TZ)
+                if detail_published < window_start or detail_published > window_end:
+                    continue
+                metrics["keyword_checks"] += 1
+                result = detail_result(
+                    candidate["account_id"], candidate["account_name"], candidate["note_id"],
+                    detail, job["keywords"], window_start, window_end
+                )
+            except WorkerBlocked:
+                raise
+            except StopTrial as error:
+                raise WorkerBlocked(str(error)) from error
+            except Exception as error:
+                failed_accounts.add(candidate["account_id"])
+                _failure(failures, candidate["account_id"], error)
+                continue
+            if result and all(item["url"] != result["url"] for item in results):
+                results.append(result)
+                if len(results) >= MAX_RESULTS:
+                    termination_reason = "results_cap"
+                    break
+    except WorkerBlocked as error:
+        return _payload(
+            "blocked", results, failures, metrics, "security_blocked", str(error)[:500]
+        )
+
+    partial = bool(failures) or termination_reason in {"detail_budget_exhausted", "runtime_cutoff"}
+    return _payload(
+        "partial" if partial else "completed", results, failures, metrics, termination_reason,
+        "部分账号读取失败，已保留其他账号结果。" if failures else None,
+    )
 
 
 def run_once() -> bool:
@@ -249,32 +349,46 @@ def run_once() -> bool:
     job = None
     try:
         claimed = api_request("/api/network/worker/claim", key, {})
+        if claimed.get("halted"):
+            halt_worker(state, "security", "服务器已因小红书安全验证停止后续任务")
+            return False
         job = claimed.get("job")
         if job is None:
             return True
         edge_client, feed_action, login_action, user_action = edge_client_type(PROFILE_PATH)
         client = edge_client(headless=True)
+        started_at = time.monotonic()
         payload = None
         try:
             client.start()
             logged_in, _ = login_action(client).check_login_status(navigate=True)
             if not logged_in:
                 raise WorkerBlocked("小红书登录已失效，需在 Edge 中人工处理")
+            action = feed_action(client)
             payload = process_job(
-                job, lambda account_id, current: collect_account(
-                    client, feed_action, user_action, account_id, current
-                )
+                job,
+                lambda account_id, _current: profile_feeds(client, user_action, account_id),
+                lambda candidate: safe_feed_detail(
+                    action, client, candidate["note_id"], candidate["token"]
+                ),
+                started_at=started_at,
             )
         except WorkerBlocked as error:
-            payload = {"status": "blocked", "results": [], "failures": [], "error_detail": str(error)}
-            halt_worker(state, "security", str(error), job["id"])
+            payload = _payload(
+                "blocked", [], [], _metrics(), "security_blocked", str(error)[:500]
+            )
         except StopTrial as error:
-            payload = {"status": "blocked", "results": [], "failures": [], "error_detail": str(error)}
-            halt_worker(state, "security", str(error), job["id"])
+            payload = _payload(
+                "blocked", [], [], _metrics(), "security_blocked", str(error)[:500]
+            )
         finally:
             client.close()
         payload["claim_token"] = job["claim_token"]
-        api_request(f"/api/network/worker/jobs/{job['id']}", key, payload)
+        try:
+            api_request(f"/api/network/worker/jobs/{job['id']}", key, payload)
+        finally:
+            if payload["status"] == "blocked":
+                halt_worker(state, "security", payload["error_detail"], job["id"])
         return payload["status"] != "blocked"
     finally:
         key = ""
@@ -302,6 +416,13 @@ def repair_login() -> None:
             raise WorkerBlocked("Edge 登录等待超时")
     finally:
         client.close()
+    if not CREDENTIAL_PATH.is_file():
+        raise RuntimeError("本地 NETWORK_WORKER_KEY 凭据未配置")
+    key = unprotect_secret(CREDENTIAL_PATH.read_bytes())
+    try:
+        api_request("/api/network/worker/claim", key, {"resume": True})
+    finally:
+        key = ""
     state.update({"halted": False, "reason": None, "detail": None, "job_id": None,
                   "updated_at": datetime.now(CHINA_TZ).isoformat(timespec="seconds")})
     atomic_json(STATE_PATH, state)
