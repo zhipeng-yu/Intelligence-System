@@ -8,11 +8,11 @@
 
 ## 当前状态
 
-小规模多用户网络资料 MVP 已部署；生产部署 `8cc8a54f` 运行源码 `aed9c23`，远端 D1 已到 `0005_add_network_materials.sql`，所需 Secret 已配置。`ADMIN_KEY` 已于 2026-09-02 轮换并随当前部署生效。真实只读 Edge 检索已验收；`Ledu-Network-Materials-Worker` 已注册为每分钟 `IgnoreNew` 并完成首次自动运行，2 个账号的任务为 `completed`、0 条结果、0 个失败且未停机。
+小规模多用户网络资料 MVP 与访问预算优化均已上线；生产部署 `1693b189` 运行源码 `4ea51be`，远端 D1 已到 `0006_add_network_budget_metrics.sql`，所需 Secret 已配置。`ADMIN_KEY` 已于 2026-09-02 轮换并随当前部署生效。真实只读 Edge 检索已验收；`Ledu-Network-Materials-Worker` 已注册为每分钟 `IgnoreNew`、状态 `Ready`，上线后首次空闲轮询返回 0，D1 与本地均未停机。
 
 旧 `Ledu-Xiaohongshu-Course-Trial` 已禁用但未删除；旧 `seen.json`、运行状态和 `held_candidates` 已原样保留，禁用前后文件哈希一致。不得删除历史候选。
 
-网络资料效率、访问预算和任务可观测性优化已在源码中实现，新增迁移为 `0006_add_network_budget_metrics.sql`；当前生产尚未包含这些改动。`Ledu-Network-Materials-Worker` 已获用户授权临时禁用并保持 `Disabled`，不得自行恢复或重注册。实现、验证状态和生产授权边界以 `new-window-prompt.md` 为准。
+网络资料效率、访问预算和任务可观测性优化已在生产生效；实现与验证结果见 `new-window-prompt.md`。
 
 ## 维护边界
 

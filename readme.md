@@ -4,7 +4,7 @@
 
 生产地址：<https://ledu-school-archive.pages.dev>
 
-“小规模多用户网络资料 MVP”已部署到生产：Pages 源码提交为 `aed9c23`，远端 D1 已应用到 `0005_add_network_materials.sql`，所需 Secret 已配置。真实只读 Edge 检索已验收；旧七日任务已禁用。访问预算优化已在源码中完成但尚未部署，`Ledu-Network-Materials-Worker` 当前保持禁用，等待生产迁移与部署授权。
+“小规模多用户网络资料 MVP”与访问预算优化均已部署到生产：Pages 部署 `1693b189` 使用源码提交 `4ea51be`，远端 D1 已应用到 `0006_add_network_budget_metrics.sql`，所需 Secret 已配置。真实只读 Edge 检索已验收；新工作器为每分钟 `IgnoreNew` 且状态 `Ready`，旧七日任务保持禁用。
 
 ## 登录与权限
 
@@ -40,7 +40,7 @@
 
 工作器使用独立 `NETWORK_WORKER_KEY`。服务端保证全局最多一个运行任务；认领采用 50 分钟租约和一次性 claim token，工作器在 40 分钟后不再开始新的详情访问。过期任务直接结束为 `lease_expired`，不再自动从头重跑；相同回传仍幂等。
 
-新任务首次自动触发后成功处理 2 个账号的队列任务，状态为 `completed`，无账号失败或安全验证，未命中结果。旧七日任务已禁用但未删除；旧 `seen.json`、运行状态和 `held_candidates` 保持原样。访问预算改动期间，新工作器计划任务已按用户授权临时禁用，完成代码验证后也不得自行恢复。
+新任务首次自动触发后成功处理 2 个账号的队列任务，状态为 `completed`，无账号失败或安全验证，未命中结果。访问预算优化上线后，工作器首次空闲轮询返回 0，本地与 D1 均未停机。旧七日任务已禁用但未删除；旧 `seen.json`、运行状态和 `held_candidates` 保持原样。
 
 验证码、登录失效或安全验证会同时写入 D1 全局停机状态和本地停机状态；只有人工 `repair-login` 成功后才显式恢复。页面显示每个结束任务的主页候选、初筛剩余、详情打开、关键词检查、命中和停止原因，并显示今日实际、预留与剩余额度；统计不完整的过期任务保留完整预留且明确标注。为避免删除任务抹掉当天预算，已占用当日预算的任务次日才允许删除。
 
@@ -64,6 +64,6 @@ npx.cmd wrangler d1 migrations apply ledu-school-archive --local --persist-to .w
 npx.cmd wrangler pages functions build
 ```
 
-测试使用模拟响应，不访问真实小红书或调用真实 AI。GPT 内置浏览器已完成 1280px 桌面、390px、键盘焦点、主导航和控制台验收；控制台无错误，截图见 `artifacts/school-archive-desktop.png`。
+测试使用模拟响应，不访问真实小红书或调用真实 AI。GPT 内置浏览器已完成登录后主流程、1280px 桌面、390px、键盘焦点、主导航和控制台验收；生产登录页也已在 1280px 与 390px 验收，无水平溢出且控制台无错误。截图见 `artifacts/school-archive-desktop.png`。
 
 代码仓库：<https://github.com/zhipeng-yu/Intelligence-System>
