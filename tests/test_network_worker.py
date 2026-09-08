@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from automation import network_worker
 from automation.network_worker import (
@@ -212,6 +212,112 @@ class NetworkWorkerTest(unittest.TestCase):
         self.assertIn("New-TimeSpan -Minutes 1", schedule)
         self.assertIn("MultipleInstances IgnoreNew", schedule)
         self.assertIn("-m automation.network_worker run", schedule)
+
+    def resolution_client(self, rows=None, profile=None):
+        client = MagicMock()
+        client._check_captcha.return_value = False
+        client.page.url = "https://www.xiaohongshu.com/search_result"
+        client.page.get_by_text.return_value.first.is_visible.return_value = False
+        client.page.locator.return_value.count.return_value = 0
+        client.navigate.side_effect = lambda url: setattr(client.page, "url", url)
+        candidate = {"red_id": "Exact_123", "account_id": "a" * 24,
+                     "url": "https://www.xiaohongshu.com/user/profile/" + "a" * 24 + "?xsec_token=ephemeral"}
+        client.page.evaluate.side_effect = [rows if rows is not None else [candidate],
+            profile if profile is not None else {"red_id": "Exact_123", "numbers": ["Exact_123"], "nickname": "测试昵称"}]
+        return client, candidate
+
+    @patch.object(network_worker.time, "sleep")
+    def test_resolution_requires_exact_search_number_and_verified_profile(self, _sleep):
+        client, _ = self.resolution_client()
+        payload = network_worker.process_resolution(client, "Exact_123")
+        self.assertEqual(payload, {"status": "ready", "red_id": "Exact_123", "account_id": "a" * 24, "nickname": "测试昵称"})
+        self.assertEqual(client.navigate.call_count, 2)
+        self.assertNotIn("ephemeral", json.dumps(payload))
+        client.page.get_by_text.assert_any_call("用户", exact=True)
+        for profile in [
+            {"red_id": "exact_123", "numbers": ["Exact_123"]},
+            {"red_id": "Exact_123", "numbers": ["Other"]},
+            {"numbers": ["Exact_123"]},
+        ]:
+            client, _ = self.resolution_client(profile=profile)
+            self.assertEqual(network_worker.process_resolution(client, "Exact_123")["error_code"], "number_mismatch")
+
+    @patch.object(network_worker.time, "sleep")
+    def test_resolution_never_uses_nickname_casefold_or_multiple_matches(self, _sleep):
+        _, candidate = self.resolution_client()
+        cases = [
+            ([{**candidate, "red_id": "exact_123", "nickname": "Exact_123"}], "not_found"),
+            ([candidate, {**candidate, "account_id": "b" * 24}], "ambiguous"),
+            ([{**candidate, "url": "https://evil.invalid/user/profile/" + "a" * 24}], "identity_mismatch"),
+            ([{**candidate, "account_id": "Exact_123"}], "identity_mismatch"),
+            ([candidate] * 21, "ambiguous"),
+        ]
+        for rows, code in cases:
+            client, _ = self.resolution_client(rows=rows)
+            self.assertEqual(network_worker.process_resolution(client, "Exact_123"), {"status": "failed", "error_code": code})
+            self.assertEqual(client.navigate.call_count, 1)
+        client, _ = self.resolution_client()
+        client.page.evaluate.side_effect = [[]] * 5
+        client.page.get_by_text.return_value.count.return_value = 1
+        self.assertEqual(network_worker.process_resolution(client, "Exact_123")["error_code"], "not_found")
+        self.assertEqual(client.navigate.call_count, 1)
+        client, _ = self.resolution_client()
+        client.page.evaluate.side_effect = [[]] * 5
+        client.page.get_by_text.return_value.count.return_value = 0
+        self.assertEqual(network_worker.process_resolution(client, "Exact_123")["error_code"], "page_unavailable")
+
+    @patch.object(network_worker.time, "sleep")
+    def test_resolution_security_and_login_stop_without_guessing_or_leaking_errors(self, _sleep):
+        for issue in ("security", "login", "late_security", "exception"):
+            client, _ = self.resolution_client()
+            if issue == "security":
+                client._check_captcha.return_value = True
+            elif issue == "login":
+                client.page.locator.return_value.count.return_value = 1
+                client.page.locator.return_value.first.is_visible.return_value = True
+            elif issue == "late_security":
+                client.page.evaluate.side_effect = StopTrial("security", "do not persist URL")
+            else:
+                client.page.evaluate.side_effect = RuntimeError("https://x.test?xsec_token=ephemeral")
+            payload = network_worker.process_resolution(client, "Exact_123")
+            self.assertEqual(payload["status"], "failed" if issue == "exception" else "blocked")
+            self.assertEqual(client.navigate.call_count, 1)
+            self.assertNotIn("ephemeral", json.dumps(payload))
+
+    def test_blocked_resolution_reports_and_halts_even_when_callback_or_close_fails(self):
+        for failure in ("callback", "close", "login_error", "none"):
+            client = MagicMock()
+            if failure == "close":
+                client.close.side_effect = RuntimeError("unsafe URL")
+            login = MagicMock()
+            login.return_value.check_login_status.return_value = (False, None)
+            if failure == "login_error":
+                login.return_value.check_login_status.side_effect = RuntimeError("unsafe URL")
+                client._check_captcha.return_value = True
+            job = {"kind": "account_resolution", "id": "resolve-job", "red_id": "Exact_123", "claim_token": "test-claim"}
+            calls = []
+            def api(path, _key, payload):
+                calls.append((path, payload))
+                if path.endswith("claim"):
+                    return {"job": job}
+                if failure == "callback":
+                    raise RuntimeError("simulated API failure")
+                return {"status": "blocked"}
+            with patch.object(network_worker, "read_state", return_value={}), \
+                 patch.object(network_worker, "CREDENTIAL_PATH") as credential, \
+                 patch.object(network_worker, "unprotect_secret", return_value="test-key"), \
+                 patch.object(network_worker, "api_request", side_effect=api), \
+                 patch.object(network_worker, "edge_client_type", return_value=(lambda **_: client, None, login, None)), \
+                 patch.object(network_worker, "halt_worker") as halt:
+                credential.is_file.return_value = True
+                if failure == "callback":
+                    with self.assertRaises(RuntimeError):
+                        network_worker.run_once()
+                else:
+                    self.assertFalse(network_worker.run_once())
+                halt.assert_called_once()
+                self.assertEqual(calls[1][0], "/api/network/worker/accounts/resolve-job")
+                self.assertEqual(calls[1][1], {"status": "blocked", "error_code": "security_blocked", "claim_token": "test-claim"})
 
     def test_summary_never_needs_ai_or_full_copy(self):
         summary = deterministic_summary(

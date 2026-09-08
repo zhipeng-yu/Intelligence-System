@@ -390,11 +390,13 @@
         <div class="split-grid section">
           <section class="panel" aria-labelledby="accounts-title">
             <h2 id="accounts-title">我的账号</h2>
-            <p class="notice">最多 3 个，仅接受 24 位标准账号 ID。</p>
+            <p class="notice" id="accountHelp">填写个人主页昵称下方的“小红书号”，提交后等待核验；不要填写昵称或链接。最多保存 3 个账号（含未通过核验的申请）。</p>
             <form class="compact-form" id="accountForm">
-              <div class="form-field"><label for="accountIdInput">小红书账号 ID</label><input id="accountIdInput" maxlength="24" pattern="[0-9a-fA-F]{24}" required></div>
+              <div class="form-field"><label for="redIdInput">小红书号</label><input id="redIdInput" maxlength="64" pattern="[A-Za-z0-9_\-]{1,64}" title="请填写小红书号：字母、数字、下划线或短横线" aria-describedby="accountHelp" autocomplete="off" spellcheck="false" required></div>
               <button class="primary-button" type="submit">添加账号</button>
             </form>
+            <p class="notice">核验申请每人每天最多 3 次，全站每天最多 20 次；删除申请不退还次数。</p>
+            <button class="action-button" id="refreshNetworkButton" type="button">刷新状态</button>
             <div class="item-list" id="accountList"></div>
             <p class="notice" id="accountMessage" role="status" aria-live="polite"></p>
           </section>
@@ -648,12 +650,30 @@
         accountList.replaceChildren(node('div', '尚未添加关注账号。', 'empty-state'));
         return;
       }
-      accountList.replaceChildren(...accounts.map(item => {
+      const labels = { queued: '等待核验', running: '正在核验', ready: '可用于检索', failed: '核验失败', blocked: '需人工处理' };
+      accountList.replaceChildren(...accounts.map((item, index) => {
         const row = node('div', '', 'item-row item-row-head');
-        row.append(node('strong', item.account_id));
-        row.append(actionButton('删除', button => deleteAccount(item, button), true));
+        const copy = node('div', '', 'update-copy');
+        const name = item.nickname || (item.red_id ? `小红书号：${item.red_id}` : `已保存账号 ${index + 1}`);
+        copy.append(node('strong', name));
+        if (item.nickname && item.red_id) copy.append(node('span', `小红书号：${item.red_id}`, 'update-meta'));
+        if (!item.red_id) copy.append(node('span', '原有账号，可继续检索', 'update-meta'));
+        copy.append(node('span', labels[item.status] || '可用于检索', `status ${item.status === 'ready' ? 'completed' : item.status}`));
+        if (item.error_detail) copy.append(node('p', item.error_detail, 'notice error'));
+        const remove = actionButton('删除', button => deleteAccount(item, button), true);
+        remove.disabled = item.status === 'running';
+        remove.setAttribute('aria-label', `删除${name}`);
+        row.append(copy, remove);
         return row;
       }));
+    }
+
+    function publicAccountText(value, ids) {
+      let text = String(value || '');
+      for (const id of ids) {
+        if (/^[0-9a-f]{24}$/i.test(id)) text = text.replace(new RegExp(id, 'gi'), '已保存账号');
+      }
+      return text;
     }
 
     function renderSearches() {
@@ -696,10 +716,14 @@
             'notice error'
           ));
         }
-        if (item.error_detail) copy.append(node('p', item.error_detail, 'notice error'));
+        if (item.error_detail) copy.append(node('p', publicAccountText(item.error_detail, item.accounts), 'notice error'));
         if (item.failures.length) {
           const failures = node('ul', '', 'failure-list');
-          failures.append(...item.failures.map(failure => node('li', `${failure.account_id}：${failure.reason}`)));
+          failures.append(...item.failures.map(failure => {
+            const account = accounts.find(account => account.account_id === failure.account_id);
+            const name = account?.nickname || (account?.red_id ? `小红书号 ${account.red_id}` : '已保存账号');
+            return node('li', `${name}：${publicAccountText(failure.reason, item.accounts)}`);
+          }));
           copy.append(failures);
         }
         const resultList = node('div', '', 'search-results');
@@ -710,8 +734,9 @@
           link.target = '_blank';
           link.rel = 'noreferrer noopener';
           card.append(link);
-          card.append(node('div', `${result.account_name} · ${formatDate(result.published_at)}`, 'result-meta'));
-          card.append(node('p', result.summary));
+          const name = /^[0-9a-f]{24}$/.test(result.account_name) ? '已保存账号' : result.account_name;
+          card.append(node('div', `${name} · ${formatDate(result.published_at)}`, 'result-meta'));
+          card.append(node('p', publicAccountText(result.summary, [result.account_id])));
           return card;
         }));
         if (item.results.length) copy.append(resultList);
@@ -962,13 +987,24 @@
 
     document.querySelector('#accountForm').addEventListener('submit', async event => {
       event.preventDefault();
-      const input = document.querySelector('#accountIdInput');
+      const input = document.querySelector('#redIdInput');
+      const button = event.currentTarget.querySelector('button');
+      button.disabled = true;
       try {
-        await apiFetch('/api/network/accounts', jsonRequest('POST', { account_id: input.value }));
+        await apiFetch('/api/network/accounts', jsonRequest('POST', { red_id: input.value.trim() }));
         input.value = '';
         await refreshNetwork();
-        showMessage(accountMessage, '关注账号已添加。', 'success');
+        showMessage(accountMessage, '申请已提交，核验通过后可用于检索。点击“刷新状态”查看进度。', 'success');
       } catch (error) { showMessage(accountMessage, error.message, 'error'); }
+      finally { button.disabled = false; }
+    });
+
+    document.querySelector('#refreshNetworkButton').addEventListener('click', async event => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      try { await refreshNetwork(); showMessage(accountMessage, '账号与检索状态已刷新。'); }
+      catch (error) { showMessage(accountMessage, error.message, 'error'); }
+      finally { button.disabled = false; }
     });
 
     document.querySelector('#searchForm').addEventListener('submit', async event => {

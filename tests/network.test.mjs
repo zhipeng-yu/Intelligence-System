@@ -113,6 +113,10 @@ class FakeDB {
     if (/FROM users\s+WHERE phone_hmac/.test(sql)) {
       return [...this.users.values()].find(user => user.phone_hmac === values[0] && user.enabled) || null;
     }
+    if (/FROM watched_accounts WHERE id/.test(sql)) {
+      const account = this.accounts.get(values[0]);
+      return account?.user_id === values[1] ? { ...account } : null;
+    }
     if (/FROM users WHERE id/.test(sql)) return this.users.get(values[0]) || null;
     if (/AS duplicate/.test(sql)) {
       const own = [...this.accounts.values()].filter(item => item.user_id === values[0]);
@@ -187,8 +191,9 @@ class FakeDB {
     }
     if (/INSERT INTO watched_accounts/.test(sql)) {
       const own = [...this.accounts.values()].filter(item => item.user_id === values[1]);
-      if (own.length >= 3 || own.some(item => item.account_id === values[2])) return { meta: { changes: 0 } };
-      this.accounts.set(values[0], { id: values[0], user_id: values[1], account_id: values[2], created_at: values[3] });
+      if (own.length >= 3) throw new Error('account_slots_full');
+      if (own.some(item => item.red_id === values[2])) throw new Error('UNIQUE');
+      this.accounts.set(values[0], { id: values[0], user_id: values[1], red_id: values[2], account_id: null, status: 'queued', created_at: values[3] });
       return { meta: { changes: 1 } };
     }
     if (/DELETE FROM watched_accounts/.test(sql)) {
@@ -376,11 +381,11 @@ test('accounts and searches enforce ownership, shapes, active work and daily lim
   await seedSession(db, 'user-b', 'session-b');
   const env = bindings(db);
   const ids = ['aaaaaaaaaaaaaaaaaaaaaaaa', 'bbbbbbbbbbbbbbbbbbbbbbbb', 'cccccccccccccccccccccccc'];
-  for (const id of ids) assert.equal((await addAccount({ request: request('/api/network/accounts', {
-    method: 'POST', cookie: 'session-a', body: { account_id: id }
-  }), env })).status, 201);
+  for (const [index, id] of ids.entries()) db.accounts.set(`legacy-${index}`, {
+    id: `legacy-${index}`, user_id: 'user-a', account_id: id, status: 'ready', created_at: new Date().toISOString()
+  });
   assert.equal((await addAccount({ request: request('/api/network/accounts', {
-    method: 'POST', cookie: 'session-a', body: { account_id: 'dddddddddddddddddddddddd' }
+    method: 'POST', cookie: 'session-a', body: { red_id: 'another_number' }
   }), env })).status, 409);
   assert.equal((await addAccount({ request: request('/api/network/accounts', {
     method: 'POST', cookie: 'session-b', body: { account_id: 'https://example.com/user' }
@@ -424,7 +429,7 @@ test('accounts and searches enforce ownership, shapes, active work and daily lim
   await seedUser(globalDb);
   await seedSession(globalDb, 'user-a', 'session-a');
   globalDb.accounts.set('global-account', { id: 'global-account', user_id: 'user-a',
-    account_id: ids[0], created_at: new Date().toISOString() });
+    account_id: ids[0], status: 'ready', created_at: new Date().toISOString() });
   for (let index = 0; index < 20; index += 1) globalDb.jobs.set(`global-${index}`, {
     ...db.jobs.get(job.id), id: `global-${index}`, user_id: `other-${index}`, status: 'completed',
     created_at: new Date().toISOString()

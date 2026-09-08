@@ -22,6 +22,10 @@ export const onRequestPost = withDatabase(async ({ request, env }) => {
         termination_reason = 'lease_expired', counts_complete = 0
     WHERE status = 'running' AND lease_expires_at <= ?1
   `).bind(nowIso).run();
+  await env.DB.prepare(`
+    UPDATE watched_accounts SET status = 'failed', error_code = 'lease_expired', lease_expires_at = NULL
+    WHERE status = 'running' AND lease_expires_at <= ?1
+  `).bind(nowIso).run();
   const control = await env.DB.prepare(`
     SELECT halted FROM network_worker_control WHERE id = 1
   `).first();
@@ -43,6 +47,7 @@ export const onRequestPost = withDatabase(async ({ request, env }) => {
       SELECT queued.id FROM network_search_jobs AS queued
       WHERE queued.status = 'queued'
         AND NOT EXISTS (SELECT 1 FROM network_search_jobs WHERE status = 'running')
+        AND NOT EXISTS (SELECT 1 FROM watched_accounts WHERE status = 'running')
         AND EXISTS (SELECT 1 FROM network_worker_control WHERE id = 1 AND halted = 0)
         AND COALESCE((
           SELECT SUM(CASE WHEN counts_complete = 1 THEN detail_opens ELSE detail_budget END)
@@ -53,6 +58,7 @@ export const onRequestPost = withDatabase(async ({ request, env }) => {
     )
       AND status = 'queued'
       AND NOT EXISTS (SELECT 1 FROM network_search_jobs WHERE status = 'running')
+      AND NOT EXISTS (SELECT 1 FROM watched_accounts WHERE status = 'running')
       AND EXISTS (SELECT 1 FROM network_worker_control WHERE id = 1 AND halted = 0)
       AND COALESCE((
         SELECT SUM(CASE WHEN counts_complete = 1 THEN detail_opens ELSE detail_budget END)
@@ -61,7 +67,25 @@ export const onRequestPost = withDatabase(async ({ request, env }) => {
     RETURNING id, keywords_json, accounts_json, days, window_start_at, created_at,
       attempt_count, detail_budget, budget_date
   `).bind(nowIso, leaseExpiresAt, claimHash, budgetDate).first();
-  if (!job) return json({ job: null });
+  if (!job) {
+    // Older workers must never receive a task they cannot process.
+    if (body?.resolve_accounts !== true) return json({ job: null });
+    const account = await env.DB.prepare(`
+      UPDATE watched_accounts
+      SET status = 'running', lease_expires_at = ?1, claim_token_hash = ?2
+      WHERE id = (
+        SELECT id FROM watched_accounts WHERE status = 'queued'
+        ORDER BY created_at, id LIMIT 1
+      ) AND status = 'queued'
+        AND NOT EXISTS (SELECT 1 FROM watched_accounts WHERE status = 'running')
+        AND NOT EXISTS (SELECT 1 FROM network_search_jobs WHERE status = 'running')
+        AND EXISTS (SELECT 1 FROM network_worker_control WHERE id = 1 AND halted = 0)
+      RETURNING id, red_id
+    `).bind(leaseExpiresAt, claimHash).first();
+    return json({ job: account ? {
+      ...account, kind: 'account_resolution', claim_token: claimToken, lease_expires_at: leaseExpiresAt
+    } : null });
+  }
   return json({ job: {
     id: job.id,
     claim_token: claimToken,

@@ -21,6 +21,21 @@ export function normalizedKeywords(value) {
   return keywords;
 }
 
+export function redId(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value.trim()) ? value.trim() : '';
+}
+
+export const ACCOUNT_ERRORS = {
+  not_found: '未找到小红书号完全一致的账号，请核对后重新添加。',
+  ambiguous: '找到多个匹配账号，无法确定，请核对小红书号。',
+  number_mismatch: '主页显示的小红书号与输入不一致，未添加。',
+  identity_mismatch: '主页身份无法核验，未添加。',
+  page_unavailable: '暂时无法核验账号，请稍后删除并重新添加。',
+  duplicate: '该账号已在你的账号列表中，请删除这条重复申请。',
+  security_blocked: '小红书需要人工登录或安全验证，已停止核验，请联系管理员。',
+  lease_expired: '核验超时，未自动重试，请删除后重新添加。'
+};
+
 export function shanghaiDayBounds(now = new Date()) {
   const local = new Date(now.getTime() + 8 * 60 * 60 * 1000);
   const startLocal = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate());

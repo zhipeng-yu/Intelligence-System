@@ -6,6 +6,8 @@
 
 “小规模多用户网络资料 MVP”与访问预算优化均已部署到生产：Pages 部署 `1693b189` 使用源码提交 `4ea51be`，远端 D1 已应用到 `0006_add_network_budget_metrics.sql`，所需 Secret 已配置。真实只读 Edge 检索已验收；新工作器为每分钟 `IgnoreNew` 且状态 `Ready`，旧七日任务保持禁用。
 
+当前 `main` 已增加“小红书号”异步核验源码和 `0007_resolve_red_ids.sql`，尚未迁移或部署到生产，也未切换计划任务所用源码或执行真实核验。
+
 ## 登录与权限
 
 - 用户输入管理员预先加入白名单的中国大陆 11 位手机号，并通过 Turnstile 登录；没有密码、短信、自助注册或自助注销。
@@ -25,7 +27,8 @@
 
 ## 网络资料
 
-- 每人最多保存 3 个 24 位十六进制小红书账号 ID；不接受昵称或链接。
+- 用户填写个人主页昵称下方、大小写完全一致的“小红书号”；不接受昵称、主页链接或内部 ID。服务端先排队核验，再把唯一匹配主页的稳定 ID 用于后续检索。
+- 每人最多保存 3 个账号（含待核验和失败申请）。账号核验按 Asia/Shanghai 限制为每人每天 3 次、全站每天 20 次，删除申请不会返还当天次数；核验未结束或失败时不能发起检索。
 - 每次输入 1～2 个关键词并选择近 1、3 或 7 日。标题与公开文案规范化后必须同时包含全部关键词。
 - 一个全局串行工作器先汇总每账号最多 20 条主页候选，排除视频、窗口外内容、无效 ID 和缺少当前会话临时参数的候选，再跨账号去重并按标题关键词命中数、发布时间安排详情顺序。标题未命中只后移，不直接排除。
 - 每次最多保存 30 条，按发布时间倒序展示账号名、发布日期、标题、干净公开链接和 100～200 字确定性摘要。
@@ -38,7 +41,7 @@
 
 `automation/network_worker.py` 复用既有 Conda 环境和锁定提交 `afa96802d3e61cdd5e7bd7b37ec59182bbe07d37` 对应的 `xiaohongshu-skill`，只启动 Windows 系统 Edge；不使用 Chrome、下载版 Chromium、stealth、指纹伪装或验证码绕过。
 
-工作器使用独立 `NETWORK_WORKER_KEY`。服务端保证全局最多一个运行任务；认领采用 50 分钟租约和一次性 claim token，工作器在 40 分钟后不再开始新的详情访问。过期任务直接结束为 `lease_expired`，不再自动从头重跑；相同回传仍幂等。
+工作器使用独立 `NETWORK_WORKER_KEY`。服务端保证账号核验与检索合计全局最多一个运行任务；两者均采用 50 分钟租约和一次性 claim token，工作器在 40 分钟后不再开始新的检索详情访问。账号核验只读取一次用户搜索页的前 20 个可见候选，并最多打开一个完全匹配的主页；过期任务直接结束为 `lease_expired`，不再自动从头重跑；相同回传仍幂等。
 
 新任务首次自动触发后成功处理 2 个账号的队列任务，状态为 `completed`，无账号失败或安全验证，未命中结果。访问预算优化上线后，工作器首次空闲轮询返回 0，本地与 D1 均未停机。旧七日任务已禁用但未删除；旧 `seen.json`、运行状态和 `held_candidates` 保持原样。
 
@@ -46,7 +49,7 @@
 
 ## 数据与接口
 
-`0005_add_network_materials.sql` 新增 `users`、`sessions`、`watched_accounts`、`network_search_jobs`、`network_search_results`。`0006_add_network_budget_metrics.sql` 为任务表增加预算日、预留额度、漏斗计数、停止原因和计数完整性，并增加单行全局停机控制表；不保存正文、媒体、评论、用户资料或临时 token。任务状态仍固定为 `queued`、`running`、`completed`、`partial`、`blocked`、`failed`。
+`0005_add_network_materials.sql` 新增 `users`、`sessions`、`watched_accounts`、`network_search_jobs`、`network_search_results`。`0006_add_network_budget_metrics.sql` 为任务表增加预算日、预留额度、漏斗计数、停止原因和计数完整性，并增加单行全局停机控制表。`0007_resolve_red_ids.sql` 原样保留已有账号、任务和结果，为账号增加小红书号、核验状态、租约及不可通过删除绕过的每日申请计数；不保存正文、媒体、评论、用户资料或临时 token。
 
 新增接口仅包括认证、管理员白名单、关注账号、检索任务以及工作器认领/回传，代码位于 `functions/api/auth/`、`functions/api/admin/` 和 `functions/api/network/`。
 
@@ -57,13 +60,13 @@
 ```powershell
 node --test tests/api.test.mjs
 node --test tests/profile.test.mjs
-node --test tests/network.test.mjs
+node --test tests/network.test.mjs tests/network-resolution.test.mjs
 %LOCALAPPDATA%\LeduSchoolArchive\xhs-course-trial\conda-env\python.exe -m unittest tests/test_xhs_course_trial.py
 %LOCALAPPDATA%\LeduSchoolArchive\xhs-course-trial\conda-env\python.exe -m unittest tests/test_network_worker.py
 npx.cmd wrangler d1 migrations apply ledu-school-archive --local --persist-to .wrangler/state
 npx.cmd wrangler pages functions build
 ```
 
-测试使用模拟响应，不访问真实小红书或调用真实 AI。GPT 内置浏览器已完成登录后主流程、1280px 桌面、390px、键盘焦点、主导航和控制台验收；生产登录页也已在 1280px 与 390px 验收，无水平溢出且控制台无错误。截图见 `artifacts/school-archive-desktop.png`。
+测试使用模拟响应，不访问真实小红书或调用真实 AI。GPT 内置浏览器已完成“小红书号”添加、状态展示、格式校验、1280px 桌面、390px、键盘焦点、主导航和控制台验收；无水平溢出且控制台无错误。截图见 `artifacts/school-archive-desktop.png`。
 
 代码仓库：<https://github.com/zhipeng-yu/Intelligence-System>

@@ -94,8 +94,11 @@ export const onRequestPost = withUser(async ({ request, env, user }) => {
   const days = Number(body?.days);
   if (!keywords || ![1, 3, 7].includes(days)) return json({ error: '关键词或日期范围无效。' }, 400);
   const { results: accountRows } = await env.DB.prepare(`
-    SELECT account_id FROM watched_accounts WHERE user_id = ?1 ORDER BY created_at, id
+    SELECT account_id, status FROM watched_accounts WHERE user_id = ?1 ORDER BY created_at, id
   `).bind(user.id).all();
+  if ((accountRows || []).some(row => row.status !== 'ready')) {
+    return json({ error: '请等待账号核验完成，或删除未通过核验的申请后再检索。' }, 409);
+  }
   const accounts = (accountRows || []).map(row => row.account_id);
   if (!accounts.length) return json({ error: '请先添加至少一个关注账号。' }, 400);
 
@@ -119,6 +122,9 @@ export const onRequestPost = withUser(async ({ request, env, user }) => {
       AND NOT EXISTS (
         SELECT 1 FROM network_search_jobs
         WHERE user_id = ?2 AND status IN ('queued', 'running')
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM watched_accounts WHERE user_id = ?2 AND status <> 'ready'
       )
   `).bind(
     id, user.id, JSON.stringify(keywords), JSON.stringify(accounts), days,

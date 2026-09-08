@@ -14,6 +14,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import urlencode, urlsplit
 import unicodedata
 from datetime import datetime
 from pathlib import Path
@@ -51,6 +52,126 @@ class WorkerBlocked(RuntimeError):
 
 class AccountFailure(RuntimeError):
     pass
+
+
+class ResolutionFailure(RuntimeError):
+    pass
+
+
+# Read only labelled, rendered numbers and their local profile links; no response/body dump.
+USER_SEARCH_ROWS = r"""() => {
+    const rows = new Map();
+    for (const element of document.querySelectorAll('span, div, p')) {
+        if (!element.offsetWidth && !element.offsetHeight) continue;
+        const value = element.innerText?.trim();
+        if (!value || value.length > 90) continue;
+        const match = value.match(/^小红书号\s*[:：]\s*([A-Za-z0-9_-]{1,64})$/);
+        if (!match) continue;
+        let parent = element;
+        for (let depth = 0; parent && depth < 5; depth++, parent = parent.parentElement) {
+            const links = [...parent.querySelectorAll('a[href*="/user/profile/"]')];
+            const urls = links.map(link => new URL(link.href, location.href)).filter(url =>
+                url.origin === 'https://www.xiaohongshu.com' &&
+                /^\/user\/profile\/[0-9a-f]{24}$/.test(url.pathname));
+            const ids = new Set(urls.map(url => url.pathname.split('/').pop()));
+            if (ids.size > 1) break;
+            if (ids.size === 1) {
+                const url = urls[0];
+                rows.set(match[1] + '\0' + url.pathname, {
+                    red_id: match[1], account_id: [...ids][0], url: url.href
+                });
+                break;
+            }
+        }
+        if (rows.size > 20) break;
+    }
+    return [...rows.values()];
+}"""
+
+
+def resolution_guard(client) -> None:
+    if client._check_captcha():
+        raise WorkerBlocked("小红书需要人工安全验证")
+    page = client.page
+    for text in ("安全验证", "请完成验证", "拖动滑块"):
+        if page.get_by_text(text, exact=False).first.is_visible():
+            raise WorkerBlocked("小红书需要人工安全验证")
+    login = page.locator(".login-container")
+    if "/login" in page.url.lower() or (login.count() and login.first.is_visible()):
+        raise WorkerBlocked("小红书登录已失效，需人工处理")
+
+
+def resolve_red_id(client, number: str) -> dict:
+    if not isinstance(number, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", number):
+        raise ResolutionFailure("number_mismatch")
+    # ponytail: one user-search page, at most 20 visible candidates and one profile;
+    # broaden only after an explicitly authorized live acceptance shows a need.
+    client.navigate("https://www.xiaohongshu.com/search_result?" + urlencode({
+        "keyword": number, "source": "web_explore_feed"
+    }))
+    client.wait_for_initial_state(timeout=30000, retries=0)
+    resolution_guard(client)
+    client.page.get_by_text("用户", exact=True).click(timeout=10000)
+    rows = []
+    for _ in range(5):
+        time.sleep(1)
+        resolution_guard(client)
+        rows = client.page.evaluate(USER_SEARCH_ROWS)
+        if rows:
+            break
+    if not rows:
+        empty = client.page.get_by_text(re.compile("^(没有找到相关用户|暂无相关用户|暂无搜索结果)$"))
+        raise ResolutionFailure("not_found" if empty.count() else "page_unavailable")
+    if len(rows) > 20:
+        raise ResolutionFailure("ambiguous")
+    matches = {row["account_id"]: row for row in rows if row.get("red_id") == number}
+    if not matches:
+        raise ResolutionFailure("not_found")
+    if len(matches) != 1:
+        raise ResolutionFailure("ambiguous")
+    account, candidate = next(iter(matches.items()))
+    target = urlsplit(candidate["url"])
+    if (not re.fullmatch(r"[0-9a-f]{24}", account) or target.scheme != "https"
+            or target.netloc != "www.xiaohongshu.com" or target.path != f"/user/profile/{account}"):
+        raise ResolutionFailure("identity_mismatch")
+    client.navigate(candidate["url"])
+    client.wait_for_initial_state(timeout=30000, retries=0)
+    resolution_guard(client)
+    current = urlsplit(client.page.url)
+    if current.netloc != target.netloc or current.path != target.path:
+        raise ResolutionFailure("identity_mismatch")
+    profile = client.page.evaluate(r"""() => {
+        const raw = window.__INITIAL_STATE__?.user?.userPageData;
+        const basic = (raw?.value ?? raw?._value)?.basicInfo;
+        const numbers = [...document.querySelectorAll('span, div, p')]
+            .filter(el => (el.offsetWidth || el.offsetHeight) && el.innerText?.length <= 90)
+            .map(el => el.innerText.trim().match(/^小红书号\s*[:：]\s*([A-Za-z0-9_-]{1,64})$/)?.[1])
+            .filter(Boolean);
+        return { red_id: basic?.redId ?? basic?.red_id,
+            nickname: basic?.nickname ?? basic?.nickName ?? '',
+            numbers: [...new Set(numbers)] };
+    }""")
+    resolution_guard(client)
+    if not isinstance(profile, dict) or profile.get("red_id") != number or profile.get("numbers") != [number]:
+        raise ResolutionFailure("number_mismatch")
+    return {"status": "ready", "red_id": number, "account_id": account,
+            "nickname": text_value(profile.get("nickname"))[:100]}
+
+
+def process_resolution(client, number: str) -> dict:
+    try:
+        return resolve_red_id(client, number)
+    except (WorkerBlocked, StopTrial):
+        return {"status": "blocked", "error_code": "security_blocked"}
+    except ResolutionFailure as error:
+        return {"status": "failed", "error_code": str(error)}
+    except Exception:
+        # Browser exceptions can contain a URL/token; persist only a fixed code.
+        try:
+            resolution_guard(client)
+        except Exception:
+            return {"status": "blocked", "error_code": "security_blocked"}
+        return {"status": "failed", "error_code": "page_unavailable"}
 
 
 def normalize_text(value: object) -> str:
@@ -187,8 +308,8 @@ def profile_feeds(client, user_action, account_id: str) -> tuple[str, list[dict]
     if not authors or authors != {account_id}:
         raise AccountFailure("主页账号身份核验失败")
     basic = profile.get("userBasicInfo") or {}
-    account_name = text_value(basic.get("nickname") or basic.get("nickName") or account_id)
-    return account_name or account_id, feeds
+    account_name = text_value(basic.get("nickname") or basic.get("nickName")) or "已保存账号"
+    return account_name, feeds
 
 
 def _metrics() -> dict:
@@ -348,13 +469,14 @@ def run_once() -> bool:
     key = unprotect_secret(CREDENTIAL_PATH.read_bytes())
     job = None
     try:
-        claimed = api_request("/api/network/worker/claim", key, {})
+        claimed = api_request("/api/network/worker/claim", key, {"resolve_accounts": True})
         if claimed.get("halted"):
             halt_worker(state, "security", "服务器已因小红书安全验证停止后续任务")
             return False
         job = claimed.get("job")
         if job is None:
             return True
+        resolving = job.get("kind") == "account_resolution"
         edge_client, feed_action, login_action, user_action = edge_client_type(PROFILE_PATH)
         client = edge_client(headless=True)
         started_at = time.monotonic()
@@ -364,31 +486,46 @@ def run_once() -> bool:
             logged_in, _ = login_action(client).check_login_status(navigate=True)
             if not logged_in:
                 raise WorkerBlocked("小红书登录已失效，需在 Edge 中人工处理")
-            action = feed_action(client)
-            payload = process_job(
-                job,
-                lambda account_id, _current: profile_feeds(client, user_action, account_id),
-                lambda candidate: safe_feed_detail(
-                    action, client, candidate["note_id"], candidate["token"]
-                ),
-                started_at=started_at,
-            )
-        except WorkerBlocked as error:
-            payload = _payload(
+            if resolving:
+                payload = process_resolution(client, job["red_id"])
+            else:
+                action = feed_action(client)
+                payload = process_job(
+                    job,
+                    lambda account_id, _current: profile_feeds(client, user_action, account_id),
+                    lambda candidate: safe_feed_detail(
+                        action, client, candidate["note_id"], candidate["token"]
+                    ),
+                    started_at=started_at,
+                )
+        except (WorkerBlocked, StopTrial) as error:
+            payload = {"status": "blocked", "error_code": "security_blocked"} if resolving else _payload(
                 "blocked", [], [], _metrics(), "security_blocked", str(error)[:500]
             )
-        except StopTrial as error:
-            payload = _payload(
-                "blocked", [], [], _metrics(), "security_blocked", str(error)[:500]
-            )
+        except Exception:
+            if resolving:
+                try:
+                    resolution_guard(client)
+                except Exception:
+                    payload = {"status": "blocked", "error_code": "security_blocked"}
+                else:
+                    payload = {"status": "failed", "error_code": "page_unavailable"}
+            else:
+                payload = _payload(
+                    "failed", [], [], _metrics(), "worker_failed", "工作器未能完成任务。"
+                )
         finally:
-            client.close()
+            try:
+                client.close()
+            except Exception:
+                if not payload or payload["status"] != "blocked":
+                    raise RuntimeError("工作器浏览器清理失败，需人工检查") from None
+            finally:
+                if payload and payload["status"] == "blocked":
+                    halt_worker(state, "security", "小红书需要人工登录或安全验证", job["id"])
         payload["claim_token"] = job["claim_token"]
-        try:
-            api_request(f"/api/network/worker/jobs/{job['id']}", key, payload)
-        finally:
-            if payload["status"] == "blocked":
-                halt_worker(state, "security", payload["error_detail"], job["id"])
+        path = "accounts" if resolving else "jobs"
+        api_request(f"/api/network/worker/{path}/{job['id']}", key, payload)
         return payload["status"] != "blocked"
     finally:
         key = ""

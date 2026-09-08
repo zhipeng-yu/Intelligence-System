@@ -1,43 +1,35 @@
 import { json, withUser } from '../../../_shared.js';
-import { accountId } from '../_shared.js';
+import { ACCOUNT_ERRORS, redId } from '../_shared.js';
 
 export const onRequestGet = withUser(async ({ env, user }) => {
   const { results } = await env.DB.prepare(`
-    SELECT id, account_id, created_at
-    FROM watched_accounts
-    WHERE user_id = ?1
-    ORDER BY created_at, id
+    SELECT id, account_id, red_id, nickname, status, error_code, created_at
+    FROM watched_accounts WHERE user_id = ?1 ORDER BY created_at, id
   `).bind(user.id).all();
-  return json({ accounts: results || [] });
+  return json({ accounts: (results || []).map(row => ({
+    ...row, error_detail: ACCOUNT_ERRORS[row.error_code] || null
+  })) });
 });
 
 export const onRequestPost = withUser(async ({ request, env, user }) => {
   let body;
   try { body = await request.json(); } catch { return json({ error: '请求格式无效。' }, 400); }
-  const account = accountId(body?.account_id);
-  if (!account) return json({ error: '只接受 24 位标准小红书账号 ID。' }, 400);
+  const number = redId(body?.red_id);
+  if (!number) return json({ error: '请填写主页显示的小红书号（字母、数字、下划线或短横线，最多 64 位），不要填写昵称或链接。' }, 400);
   const id = crypto.randomUUID();
   const createdAt = new Date().toISOString();
   try {
-    const result = await env.DB.prepare(`
-      INSERT INTO watched_accounts (id, user_id, account_id, created_at)
-      SELECT ?1, ?2, ?3, ?4
-      WHERE (SELECT COUNT(*) FROM watched_accounts WHERE user_id = ?2) < 3
-        AND NOT EXISTS (
-          SELECT 1 FROM watched_accounts WHERE user_id = ?2 AND account_id = ?3
-        )
-    `).bind(id, user.id, account, createdAt).run();
-    if (!result.meta.changes) {
-      const existing = await env.DB.prepare(`
-        SELECT COUNT(*) AS count,
-          EXISTS (SELECT 1 FROM watched_accounts WHERE user_id = ?1 AND account_id = ?2) AS duplicate
-        FROM watched_accounts WHERE user_id = ?1
-      `).bind(user.id, account).first();
-      return json({ error: existing?.duplicate ? '该账号已关注。' : '每位用户最多关注 3 个账号。' }, 409);
-    }
+    await env.DB.prepare(`
+      INSERT INTO watched_accounts (id, user_id, red_id, created_at, status)
+      VALUES (?1, ?2, ?3, ?4, 'queued')
+    `).bind(id, user.id, number, createdAt).run();
   } catch (error) {
-    if (/UNIQUE|constraint/i.test(String(error))) return json({ error: '该账号已关注。' }, 409);
+    const message = String(error);
+    if (/account_slots_full/.test(message)) return json({ error: '每位用户最多保存 3 个账号（含待核验和失败申请）。' }, 409);
+    if (/account_work_active/.test(message)) return json({ error: '请等待当前账号核验或检索结束后再添加。' }, 409);
+    if (/account_daily_limit/.test(message)) return json({ error: '今日账号核验申请已达上限：每人 3 次，全站 20 次。' }, 429);
+    if (/UNIQUE/.test(message)) return json({ error: '该小红书号已在账号列表中。' }, 409);
     throw error;
   }
-  return json({ account: { id, account_id: account, created_at: createdAt } }, 201);
+  return json({ account: { id, red_id: number, nickname: '', status: 'queued', created_at: createdAt } }, 202);
 });
