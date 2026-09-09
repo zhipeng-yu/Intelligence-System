@@ -4,10 +4,10 @@
 
 ## 当前结论
 
-- “小规模多用户网络资料 MVP”、访问预算优化和“小红书号”异步核验已部署到 <https://ledu-school-archive.pages.dev>；当前生产部署 `5df53e87` 使用源码提交 `4162d08`，远端 D1 已应用到 `0007_resolve_red_ids.sql`。
+- “小规模多用户网络资料 MVP”、访问预算优化、“小红书号”异步核验和浏览器自由选择已部署到 <https://ledu-school-archive.pages.dev>；当前生产部署 `4310e4b9` 使用源码提交 `6e2ff6f`，远端 D1 已应用到 `0007_resolve_red_ids.sql`。
 - 所需生产 Secret 已配置；`ADMIN_KEY` 于 2026-09-02 完成轮换并随当前部署生效，旧的标准域名管理员链接已经失效。秘密与新管理链接均未写入仓库或文档。
-- 真实只读账号核验与检索已验收：账号“学而思网校”、小红书号 `27247756272` 核验为 `ready`；关键词“学习”、近 7 日的任务为 `completed / candidates_exhausted`，20 条主页候选均不在窗口内，详情打开与命中均为 0。
-- `Ledu-Network-Materials-Worker` 使用提交 `4162d08` 的源码，注册为每分钟触发且 `MultipleInstances IgnoreNew`。2026-09-09 再次筛选时专用 Edge 登录失效，计划任务已禁用、本地 `login` 停机状态与 Windows 通知已写入，等待人工 `repair-login` 显式恢复。
+- 真实只读账号核验与有结果检索已验收：账号“杨老师的陪跑日记”、小红书号 `9522680303` 核验为 `ready`；关键词“学习”、近 7 日的任务为 `completed / candidates_exhausted`，20 条主页候选中 6 条在窗口内，打开并检查 6 条详情，命中并保存 5 条。
+- `Ledu-Network-Materials-Worker` 使用提交 `6e2ff6f` 的源码，注册为每分钟触发且 `MultipleInstances IgnoreNew`。人工登录已恢复，本地和 D1 停机标志均为关闭，任务状态为 `Ready`，恢复后的空闲轮询返回 0。
 - 旧 `Ledu-Xiaohongshu-Course-Trial` 已禁用但未删除；旧 `seen.json`、状态文件和其中的 `held_candidates` 原样保留，禁用前后文件哈希一致。
 - 现有生产 D1、私有 R2、Workers AI 与方舟闭环保持原状。秘密和管理链接不得进入 Git、聊天、日志、截图或普通文档。
 - 本轮未修改 Secret、调用真实 AI、删除旧任务或历史候选，也未执行远端删除。
@@ -37,18 +37,18 @@
 - `node --test tests/api.test.mjs`：8 项通过。
 - `node --test tests/profile.test.mjs`：9 项通过；包含第九卡数据存在但页面/API 隐藏。
 - `node --test tests/network.test.mjs tests/network-resolution.test.mjs`：12 项通过；除原网络资料覆盖外，新增覆盖 `0007` 兼容迁移、用户隔离、精确小红书号输入、旧工作器兼容、全局串行认领、租约与幂等回传、稳定 ID 快照、重复账号、删除后配额、过期不重领和 blocked 全局停机。
-- 既有 Conda Python 环境运行 `tests/test_xhs_course_trial.py`：9 项通过。
+- 既有 Conda Python 环境运行 `tests/test_xhs_course_trial.py`：10 项通过，包含浏览器可执行文件环境变量覆盖。
 - 同一环境运行 `tests/test_network_worker.py`：15 项通过；覆盖原检索流程以及小红书号精确匹配、大小写不猜测、歧义与错误页、主页二次核验、安全阻断、固定错误码和回传/关闭异常处理。
 - 全新临时 D1 依次应用 `0001`～`0007` 成功。
 - Pages Functions 构建成功。
 - GPT 内置浏览器使用本地模拟数据完成小红书号添加、排队/成功/失败状态、输入格式、1280px 桌面、390px、移动端主导航、键盘焦点和控制台验收；无水平溢出，控制台无错误，截图已更新。
-- 专用浏览器会话完成首次人工授权的真实只读检索；随后新计划任务完成首次自动触发。再次尝试筛出一条结果时，公开搜索页报告登录失效，验收按停机规则中止且没有创建新的生产任务。
+- 人工恢复登录后，生产工作器完成第二个账号的正式核验和有结果检索；任务漏斗为 20 条主页候选、6 条窗口内图文、6 次详情检查、5 条命中与保存。随后计划任务恢复并完成一次返回 0 的空闲轮询。
 
 测试均使用模拟数据，不访问真实小红书、不调用真实 AI，也没有读取现有 Secret、Cookie 或浏览器会话文件。
 
 ## 当前运维状态
 
-- 生产 D1、Pages 和本机工作器均已切换到 `0007`/`4162d08`；账号核验与检索均无活动任务，`network_worker_control.halted = 0`。本机工作器处于 `login` 停机状态且计划任务已禁用。
+- 生产 D1、Pages 和本机工作器均已切换到 `0007`/`6e2ff6f`；账号核验与检索均无活动任务，`network_worker_control.halted = 0`，本机工作器停机标志为关闭，计划任务为 `Ready`。
 - 若任务因验证码、登录失效或安全验证变为 `blocked`，只运行 `repair-login` 由用户人工处理并显式恢复，禁止自动重试或绕过。
 - 管理模式链接复核不在本次范围内，本次未读取或输出任何管理链接。禁止强推；认证失败、冲突、非快进或未知远端提交时立即停止。
 
