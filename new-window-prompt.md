@@ -7,7 +7,7 @@
 - Pages 部署 `5df53e87`，源码提交 `4162d08`，生产地址 <https://ledu-school-archive.pages.dev>。
 - 远端 D1 已应用 `0001`～`0007`，无待应用迁移；原有账号、任务和结果完整保留，外键检查通过。
 - `Ledu-Network-Materials-Worker` 使用提交 `4162d08`，注册为每分钟触发、`MultipleInstances IgnoreNew`。2026-09-09 再次筛选时专用 Edge 登录失效，计划任务已禁用，本地 `login` 停机状态与 Windows 通知已写入，等待人工 `repair-login` 显式恢复。
-- `Ledu-Xiaohongshu-Course-Trial` 仍为 `Disabled`，旧 `seen.json`、状态与 `held_candidates` 未改动。
+- `Ledu-Xiaohongshu-Course-Trial` 仍为 `Disabled`，旧 `seen.json`、状态与 `held_candidates` 未改动。工作器浏览器可显式指定或自动选择可用的本地 Edge、Chrome 或 Playwright Chromium。
 - 既有 Secret 未修改；未调用真实 AI、未删除旧任务或历史候选，也未执行任何远端删除。
 
 ## 真实只读验收
@@ -27,4 +27,4 @@
 
 ## 后续边界
 
-继续遵守 `AGENTS.md`。验证码、登录失效或安全验证必须 blocked、通知并停机，只能人工运行 `repair-login` 显式恢复。不得删除旧任务、历史候选或读取、输出 Secret、Cookie、管理链接、Edge 会话文件和原始凭据。
+继续遵守 `AGENTS.md`。验证码、登录失效或安全验证必须 blocked、通知并停机，只能人工运行 `repair-login` 显式恢复。不得删除旧任务、历史候选或读取、输出 Secret、Cookie、管理链接、浏览器会话文件和原始凭据。

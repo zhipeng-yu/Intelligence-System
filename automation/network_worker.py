@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Single serial system-Edge worker for small-scale network materials."""
+"""Single serial browser worker for small-scale network materials."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from automation.xhs_course_trial import (
     CHINA_TZ,
     StopTrial,
     atomic_json,
-    edge_client_type,
+    browser_client_type,
     feed_timestamp,
     note_text,
     notify,
@@ -477,15 +477,15 @@ def run_once() -> bool:
         if job is None:
             return True
         resolving = job.get("kind") == "account_resolution"
-        edge_client, feed_action, login_action, user_action = edge_client_type(PROFILE_PATH)
-        client = edge_client(headless=True)
+        browser_client, feed_action, login_action, user_action = browser_client_type(PROFILE_PATH)
+        client = browser_client(headless=True)
         started_at = time.monotonic()
         payload = None
         try:
             client.start()
             logged_in, _ = login_action(client).check_login_status(navigate=True)
             if not logged_in:
-                raise WorkerBlocked("小红书登录已失效，需在 Edge 中人工处理")
+                raise WorkerBlocked("小红书登录已失效，需在浏览器中人工处理")
             if resolving:
                 payload = process_resolution(client, job["red_id"])
             else:
@@ -533,24 +533,24 @@ def run_once() -> bool:
 
 def repair_login() -> None:
     state = read_state()
-    edge_client, feed_action, login_action, user_action = edge_client_type(PROFILE_PATH)
-    client = edge_client(headless=False)
+    browser_client, feed_action, login_action, user_action = browser_client_type(PROFILE_PATH)
+    client = browser_client(headless=False)
     try:
         client.start()
         action = login_action(client)
         logged_in, _ = action.check_login_status(navigate=True)
         if not logged_in:
-            notify("网络资料工作器", "请在已打开的 Edge 中完成小红书登录")
+            notify("网络资料工作器", "请在已打开的浏览器中完成小红书登录")
             deadline = time.monotonic() + 600
             while time.monotonic() < deadline:
                 if client._check_captcha():
-                    raise WorkerBlocked("请先在 Edge 中完成人工安全验证")
+                    raise WorkerBlocked("请先在浏览器中完成人工安全验证")
                 logged_in, _ = action.check_login_status(navigate=False)
                 if logged_in:
                     break
                 time.sleep(2)
         if not logged_in:
-            raise WorkerBlocked("Edge 登录等待超时")
+            raise WorkerBlocked("浏览器登录等待超时")
     finally:
         client.close()
     if not CREDENTIAL_PATH.is_file():
@@ -563,7 +563,7 @@ def repair_login() -> None:
     state.update({"halted": False, "reason": None, "detail": None, "job_id": None,
                   "updated_at": datetime.now(CHINA_TZ).isoformat(timespec="seconds")})
     atomic_json(STATE_PATH, state)
-    print("Edge 登录已核验，网络资料工作器已显式恢复。")
+    print("浏览器登录已核验，网络资料工作器已显式恢复。")
 
 
 def provision_secret(repo: Path) -> None:

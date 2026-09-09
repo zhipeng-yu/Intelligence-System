@@ -1,16 +1,21 @@
 import unittest
 import io
+import os
+import tempfile
 import urllib.error
 import urllib.request
 from pathlib import Path
 import inspect
+from unittest.mock import patch
 
 from automation.xhs_course_trial import (
     TARGET_USER_ID,
     HTTP_USER_AGENT,
+    BROWSER_ENV,
+    browser_executable,
     clean_feeds,
     extract_note_record,
-    edge_client_type,
+    browser_client_type,
     is_historical_candidate,
     json_request,
     multipart,
@@ -97,12 +102,20 @@ class TrialFactsTest(unittest.TestCase):
         self.assertNotIn("share_id", document)
         self.assertIn("99 元", record["summary"])
 
-    def test_edge_adapter_has_no_stealth_or_fingerprint_overrides(self):
-        source = inspect.getsource(edge_client_type)
-        self.assertIn("executable_path=str(EDGE)", source)
+    def test_browser_adapter_accepts_available_browser_without_stealth_overrides(self):
+        source = inspect.getsource(browser_client_type)
+        self.assertIn("browser_executable()", source)
+        self.assertIn("launch_persistent_context(**options)", source)
         self.assertNotIn("add_init_script", source)
         self.assertNotIn("user_agent", source)
         self.assertNotIn("ignore_default_args", source)
+
+    def test_browser_executable_accepts_configured_local_browser(self):
+        with tempfile.TemporaryDirectory() as directory:
+            executable = Path(directory) / "browser.exe"
+            executable.touch()
+            with patch.dict(os.environ, {BROWSER_ENV: str(executable)}):
+                self.assertEqual(browser_executable(), executable)
 
     def test_scheduled_task_is_daily_bounded_and_catches_up(self):
         script = Path("automation/register_xhs_course_trial.ps1").read_text(encoding="utf-8")

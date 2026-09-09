@@ -37,7 +37,7 @@
 
 ## 本机工作器
 
-`automation/network_worker.py` 复用既有 Conda 环境和锁定提交 `afa96802d3e61cdd5e7bd7b37ec59182bbe07d37` 对应的 `xiaohongshu-skill`，只启动 Windows 系统 Edge；不使用 Chrome、下载版 Chromium、stealth、指纹伪装或验证码绕过。
+`automation/network_worker.py` 复用既有 Conda 环境和锁定提交 `afa96802d3e61cdd5e7bd7b37ec59182bbe07d37` 对应的 `xiaohongshu-skill`。浏览器可通过 `LEDU_BROWSER_EXECUTABLE` 指定；未指定时自动选择可用的本地 Edge、Chrome 或 Playwright Chromium。工作器不使用 stealth、指纹伪装或验证码绕过。
 
 工作器使用独立 `NETWORK_WORKER_KEY`。服务端保证账号核验与检索合计全局最多一个运行任务；两者均采用 50 分钟租约和一次性 claim token，工作器在 40 分钟后不再开始新的检索详情访问。账号核验只读取一次用户搜索页的前 20 个可见候选，并最多打开一个完全匹配的主页；过期任务直接结束为 `lease_expired`，不再自动从头重跑；相同回传仍幂等。
 

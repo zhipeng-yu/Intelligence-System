@@ -25,7 +25,14 @@ TARGET_USER_ID = "565aa55cb8ce1a32c6fdebe7"
 SKILL_COMMIT = "afa96802d3e61cdd5e7bd7b37ec59182bbe07d37"
 SITE = "https://ledu-school-archive.pages.dev"
 HTTP_USER_AGENT = "Ledu-XHS-Course-Trial/1.0"
-EDGE = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
+BROWSER_ENV = "LEDU_BROWSER_EXECUTABLE"
+BROWSER_CANDIDATES = (
+    Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
+    Path(r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"),
+    Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
+    Path(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
+    Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir())) / "Google/Chrome/Application/chrome.exe",
+)
 CHINA_TZ = timezone(timedelta(hours=8), "Asia/Shanghai")
 ROOT = Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir())) / "LeduSchoolArchive" / "xhs-course-trial"
 STATE_PATH = ROOT / "state.json"
@@ -169,30 +176,41 @@ def load_skill():
     return sync_playwright, XiaohongshuClient, FeedDetailAction, LoginAction, UserProfileAction
 
 
-def edge_client_type(profile_path: Path = PROFILE_PATH):
+def browser_executable() -> Path | None:
+    configured = os.environ.get(BROWSER_ENV)
+    if configured:
+        path = Path(configured)
+        if not path.is_file():
+            raise StopTrial("browser", "配置的浏览器不可用")
+        return path
+    return next((path for path in BROWSER_CANDIDATES if path.is_file()), None)
+
+
+def browser_client_type(profile_path: Path = PROFILE_PATH):
     sync_playwright, base_client, feed_action, login_action, user_action = load_skill()
 
-    class EdgeClient(base_client):
-        """Transparent Playwright control of the installed system Edge."""
+    class BrowserClient(base_client):
+        """Playwright control of an available local Chromium browser."""
 
         def __init__(self, headless: bool):
             super().__init__(headless=headless, cookie_path=str(profile_path.parent / "unused-cookie-backup.json"),
                              user_data_dir=str(profile_path), timeout=45)
 
         def start(self):
-            if not EDGE.is_file():
-                raise StopTrial("edge", "未找到本机 Microsoft Edge")
             profile_path.mkdir(parents=True, exist_ok=True)
             self.playwright = sync_playwright().start()
-            self.context = self.playwright.chromium.launch_persistent_context(
+            options = dict(
                 user_data_dir=str(profile_path),
-                executable_path=str(EDGE),
                 headless=self.headless,
                 locale="zh-CN",
                 timezone_id="Asia/Shanghai",
                 viewport={"width": 1280, "height": 900},
                 service_workers="block",
             )
+            executable = browser_executable()
+            if executable:
+                options["executable_path"] = str(executable)
+            self.context = self.playwright.chromium.launch_persistent_context(**options)
             self.context.route(
                 "**/*",
                 lambda route: route.abort()
@@ -236,7 +254,7 @@ def edge_client_type(profile_path: Path = PROFILE_PATH):
             except Exception:
                 pass
             if self._check_captcha():
-                raise StopTrial("security", "小红书要求验证，需在 Edge 中人工处理")
+                raise StopTrial("security", "小红书要求验证，需在浏览器中人工处理")
 
         def wait_for_initial_state(self, timeout: int = 30000, retries: int = 2):
             def login_required():
@@ -245,19 +263,19 @@ def edge_client_type(profile_path: Path = PROFILE_PATH):
                 return "/login" in url or (login.count() and login.first.is_visible())
 
             if login_required():
-                raise StopTrial("login", "小红书登录已失效，需在 Edge 中人工处理")
+                raise StopTrial("login", "小红书登录已失效，需在浏览器中人工处理")
             try:
                 super().wait_for_initial_state(timeout=timeout, retries=retries)
             except Exception as error:
                 if error.__class__.__name__ == "CaptchaError" or self._check_captcha():
-                    raise StopTrial("security", "小红书要求验证，需在 Edge 中人工处理") from error
+                    raise StopTrial("security", "小红书要求验证，需在浏览器中人工处理") from error
                 raise
             if login_required():
-                raise StopTrial("login", "小红书登录已失效，需在 Edge 中人工处理")
+                raise StopTrial("login", "小红书登录已失效，需在浏览器中人工处理")
             if self._check_captcha():
-                raise StopTrial("security", "小红书要求验证，需在 Edge 中人工处理")
+                raise StopTrial("security", "小红书要求验证，需在浏览器中人工处理")
 
-    return EdgeClient, feed_action, login_action, user_action
+    return BrowserClient, feed_action, login_action, user_action
 
 
 def feed_timestamp(feed: dict) -> int:
@@ -325,25 +343,25 @@ def wait_for_login(client, login_action, timeout: int = 600) -> None:
     logged_in, _ = action.check_login_status(navigate=True)
     if logged_in:
         return
-    notify("小红书笔记试运行", "请在已打开的 Edge 中完成小红书登录")
+    notify("小红书笔记试运行", "请在已打开的浏览器中完成小红书登录")
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if client._check_captcha():
             notify("需要人工处理", "小红书显示安全验证；自动化已停止")
-            input("请在 Edge 中人工处理后按回车退出，再重新运行。")
+            input("请在浏览器中人工处理后按回车退出，再重新运行。")
             raise StopTrial("security", "安全验证需人工处理")
         logged_in, _ = action.check_login_status(navigate=False)
         if logged_in:
             return
         time.sleep(2)
-    raise StopTrial("login", "Edge 登录等待超时")
+    raise StopTrial("login", "浏览器登录等待超时")
 
 
 def baseline() -> None:
     if SEEN_PATH.exists():
         raise StopTrial("state", "seen.json 已存在，不会覆盖首次基线")
-    edge_client, feed_action, login_action, user_action = edge_client_type()
-    client = edge_client(headless=False)
+    browser_client, feed_action, login_action, user_action = browser_client_type()
+    client = browser_client(headless=False)
     try:
         client.start()
         wait_for_login(client, login_action)
@@ -376,8 +394,8 @@ def baseline() -> None:
 
 def repair_login() -> None:
     state = read_json(STATE_PATH)
-    edge_client, feed_action, login_action, user_action = edge_client_type()
-    client = edge_client(headless=False)
+    browser_client, feed_action, login_action, user_action = browser_client_type()
+    client = browser_client(headless=False)
     try:
         client.start()
         wait_for_login(client, login_action)
@@ -387,7 +405,7 @@ def repair_login() -> None:
     if state.get("halt_reason") in {"login", "security", "identity"}:
         state.update({"halted": False, "halt_reason": None, "status": "ready", "updated_at": iso_now()})
         atomic_json(STATE_PATH, state)
-    notify("小红书笔记试运行", "Edge 登录与目标账号已重新核验")
+    notify("小红书笔记试运行", "浏览器登录与目标账号已重新核验")
 
 
 def note_value(detail: dict) -> dict:
@@ -483,13 +501,13 @@ def safe_feed_detail(action, client, note_id: str, token: str) -> dict | None:
 
 
 def collect_new(seen_ids: set[str]) -> tuple[list[str], list[dict]]:
-    edge_client, feed_action, login_action, user_action = edge_client_type()
-    client = edge_client(headless=True)
+    browser_client, feed_action, login_action, user_action = browser_client_type()
+    client = browser_client(headless=True)
     try:
         client.start()
         logged_in, _ = login_action(client).check_login_status(navigate=True)
         if not logged_in:
-            raise StopTrial("login", "小红书登录已失效，请在 Edge 中重新登录")
+            raise StopTrial("login", "小红书登录已失效，请在浏览器中重新登录")
         _, feeds = get_profile(client, user_action)
         new_feeds = new_feeds_before_seen(feeds, seen_ids)
         records = []
@@ -537,14 +555,17 @@ def make_pdf(records: list[dict]) -> Path:
     pdf_path = html_path.with_suffix(".pdf")
     try:
         html_path.write_text(report_html(records), encoding="utf-8")
+        executable = browser_executable()
+        if executable is None:
+            raise StopTrial("upload", "没有可用于生成 PDF 的本地浏览器")
         result = subprocess.run(
-            [str(EDGE), "--headless=new", "--disable-gpu", "--no-pdf-header-footer",
+            [str(executable), "--headless=new", "--disable-gpu", "--no-pdf-header-footer",
              f"--print-to-pdf={pdf_path}", html_path.resolve().as_uri()],
             check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         if result.returncode or not pdf_path.is_file() or pdf_path.read_bytes()[:5] != b"%PDF-":
-            raise StopTrial("upload", "系统 Edge 未能生成当日 PDF")
+            raise StopTrial("upload", "浏览器未能生成当日 PDF")
         return pdf_path
     finally:
         html_path.unlink(missing_ok=True)

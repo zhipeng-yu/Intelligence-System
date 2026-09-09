@@ -200,11 +200,11 @@ class NetworkWorkerTest(unittest.TestCase):
                 self.assertFalse(network_worker.run_once())
                 api.assert_not_called()
 
-    def test_worker_uses_system_edge_catches_initial_state_security_and_keeps_schedule_boundary(self):
-        edge_source = inspect.getsource(network_worker.edge_client_type)
-        self.assertIn("def wait_for_initial_state", edge_source)
-        self.assertIn('error.__class__.__name__ == "CaptchaError"', edge_source)
-        self.assertNotIn("add_init_script", edge_source)
+    def test_worker_uses_available_browser_catches_initial_state_security_and_keeps_schedule_boundary(self):
+        browser_source = inspect.getsource(network_worker.browser_client_type)
+        self.assertIn("def wait_for_initial_state", browser_source)
+        self.assertIn('error.__class__.__name__ == "CaptchaError"', browser_source)
+        self.assertNotIn("add_init_script", browser_source)
         self.assertNotIn("playwright install", inspect.getsource(network_worker))
         self.assertIn('{"resume": True}', inspect.getsource(network_worker.repair_login))
         schedule = Path("automation/register_network_worker.ps1").read_text(encoding="utf-8")
@@ -307,7 +307,7 @@ class NetworkWorkerTest(unittest.TestCase):
                  patch.object(network_worker, "CREDENTIAL_PATH") as credential, \
                  patch.object(network_worker, "unprotect_secret", return_value="test-key"), \
                  patch.object(network_worker, "api_request", side_effect=api), \
-                 patch.object(network_worker, "edge_client_type", return_value=(lambda **_: client, None, login, None)), \
+                 patch.object(network_worker, "browser_client_type", return_value=(lambda **_: client, None, login, None)), \
                  patch.object(network_worker, "halt_worker") as halt:
                 credential.is_file.return_value = True
                 if failure == "callback":

@@ -6,7 +6,7 @@
 
 本轮按 ponytail full 在原架构上增加最小多用户能力：一个原生页面、一个 D1 迁移、三组 Pages Functions 接口和一个本机串行工作器。没有增加框架、构建体系、第三方队列、新服务、短信、密码、R2/PDF 链路、网络资料 AI 或版本系统。
 
-生产部署 `5df53e87` 使用源码提交 `4162d08`，远端 D1 已应用到 `0007`。既有生产 Secret 未修改；首次真实只读 Edge 账号核验与检索已验收。2026-09-09 再次筛选时登录失效，新工作器计划任务已禁用并等待人工恢复。
+生产部署 `5df53e87` 使用源码提交 `4162d08`，远端 D1 已应用到 `0007`。既有生产 Secret 未修改；首次真实只读账号核验与检索已验收。2026-09-09 再次筛选时登录失效，新工作器计划任务已禁用并等待人工恢复。
 
 ## 学校资料兼容
 
@@ -46,7 +46,7 @@ network_worker_control (单行全局安全停机)
 
 ## 工作器
 
-`automation/network_worker.py` 复用既有 Conda 与固定版 `xiaohongshu-skill`，通过 `edge_client_type(PROFILE_PATH)` 使用独立的系统 Edge profile。关闭浏览器时清除专用 profile 的 History/Sessions 文件，保留登录所需站点存储，避免把含临时参数的访问记录长期留存。
+`automation/network_worker.py` 复用既有 Conda 与固定版 `xiaohongshu-skill`，通过 `browser_client_type(PROFILE_PATH)` 使用独立浏览器 profile。可用 `LEDU_BROWSER_EXECUTABLE` 指定本地浏览器；未指定时自动选择可用的 Edge、Chrome 或 Playwright Chromium。关闭浏览器时清除专用 profile 的 History/Sessions 文件，保留登录所需站点存储，避免把含临时参数的访问记录长期留存。
 
 已注册的任务计划配置为每分钟启动一次、`MultipleInstances IgnoreNew`；当前因专用 Edge 登录失效而禁用，本地停机原因为 `login`。API 用独立工作器密钥、50 分钟租约和 claim token 控制认领与回传，D1 条件更新保证账号核验和检索合计全局最多一个运行任务；旧工作器不会收到核验任务，过期任务不重领，同一 payload 可安全重复提交。
 
@@ -62,4 +62,4 @@ network_worker_control (单行全局安全停机)
 
 ## 生产状态
 
-生产已包含 `0007`、小红书号核验、预算与可观测性 API、工作器漏斗和页面展示改动。Pages 与本机工作器使用提交 `4162d08`；账号核验与检索均无活动任务，D1 全局停机状态为 0，本机工作器为 `login` 停机且计划任务已禁用。第一阶段仍只使用系统 Edge 和每账号 20 条候选，不做签名逆向、网络响应监听、代理、Cookie/IP 轮换、并发或完整内容持久化。
+生产已包含 `0007`、小红书号核验、预算与可观测性 API、工作器漏斗和页面展示改动。Pages 与本机工作器使用提交 `4162d08`；账号核验与检索均无活动任务，D1 全局停机状态为 0，本机工作器为 `login` 停机且计划任务已禁用。每账号仍只读取 20 条候选，不做签名逆向、网络响应监听、代理、Cookie/IP 轮换、并发或完整内容持久化。
