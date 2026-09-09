@@ -78,6 +78,8 @@ class FakeDB {
   }
 
   async first(sql, values) {
+    if (/UPDATE (network_bindings|watched_accounts)/.test(sql)) return null;
+    if (/SELECT (profile_id|user_id) FROM network_bindings/.test(sql)) return { profile_id: '00000000-0000-4000-8000-000000000000', user_id: values[0] };
     if (/UPDATE network_search_jobs[\s\S]*RETURNING/.test(sql)) {
       const [now, expires, claimHash, budgetDate] = values;
       const running = [...this.jobs.values()].some(item => item.status === 'running');
@@ -140,6 +142,7 @@ class FakeDB {
   }
 
   async run(sql, values) {
+    if (/UPDATE network_bindings/.test(sql)) return { meta: { changes: 1 } };
     if (/termination_reason = 'lease_expired'/.test(sql)) {
       let changes = 0;
       for (const job of this.jobs.values()) {
@@ -273,6 +276,7 @@ function bindings(db, turnstile = true) {
 }
 
 function request(path, { method = 'GET', body, cookie, admin = false, worker } = {}) {
+  if (worker && body) body = { ...body, user_sessions: true };
   const headers = new Headers();
   if (body !== undefined) headers.set('Content-Type', 'application/json');
   if (cookie) headers.set('Cookie', `ledu_session=${cookie}`);

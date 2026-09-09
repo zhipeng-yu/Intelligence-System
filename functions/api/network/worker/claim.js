@@ -1,13 +1,21 @@
 import { isWorker, json, randomToken, sha256Hex, withDatabase } from '../../../_shared.js';
+import { expireBindings } from '../binding.js';
 import { DETAIL_DAILY_LIMIT, parseArray, shanghaiDate } from '../_shared.js';
 
 export const onRequestPost = withDatabase(async ({ request, env }) => {
   if (!await isWorker(request, env)) return json({ error: '工作器凭据无效。' }, 401);
   let body;
   try { body = await request.json(); } catch { return json({ error: '请求格式无效。' }, 400); }
+  if (body?.user_sessions !== true) return json({ error: '工作器需要升级为用户隔离版本。' }, 409);
+  await expireBindings(env);
   const now = new Date();
   const nowIso = now.toISOString();
   if (body?.resume === true) {
+    const restored = await env.DB.prepare(`UPDATE network_bindings SET status = CASE WHEN status IN ('blocked','invalid') THEN 'ready' ELSE status END
+      WHERE profile_id = ?1 AND lease_token_hash IS NULL
+        AND EXISTS (SELECT 1 FROM users WHERE id = network_bindings.user_id AND enabled = 1)
+    `).bind(body.profile_id || '').run();
+    if (!restored.meta.changes) return json({ error: '请指定需人工恢复的已绑定用户。' }, 409);
     await env.DB.prepare(`
       UPDATE network_worker_control
       SET halted = 0, halt_reason = NULL, updated_at = ?1
@@ -31,6 +39,23 @@ export const onRequestPost = withDatabase(async ({ request, env }) => {
   `).first();
   if (control?.halted) return json({ job: null, halted: true });
 
+  const bindingToken = randomToken();
+  const bindingHash = await sha256Hex(bindingToken);
+  const bindingLease = new Date(now.getTime() + 180000).toISOString();
+  const binding = await env.DB.prepare(`UPDATE network_bindings
+    SET lease_request_id = request_id, lease_token_hash = ?1, lease_expires_at = ?2
+    WHERE user_id = (SELECT user_id FROM network_bindings
+      WHERE status IN ('queued','unbinding') AND lease_token_hash IS NULL
+        AND EXISTS (SELECT 1 FROM users WHERE id = network_bindings.user_id AND enabled = 1)
+      ORDER BY created_at, user_id LIMIT 1)
+      AND NOT EXISTS (SELECT 1 FROM network_bindings WHERE lease_token_hash IS NOT NULL)
+      AND NOT EXISTS (SELECT 1 FROM network_search_jobs WHERE status = 'running')
+      AND NOT EXISTS (SELECT 1 FROM watched_accounts WHERE status = 'running')
+      AND EXISTS (SELECT 1 FROM network_worker_control WHERE id = 1 AND halted = 0)
+    RETURNING user_id, profile_id, request_id, status
+  `).bind(bindingHash, bindingLease).first();
+  if (binding) return json({ job: { ...binding, kind: 'binding', claim_token: bindingToken,
+    lease_expires_at: bindingLease } });
   const budgetDate = shanghaiDate(now);
   const leaseExpiresAt = new Date(now.getTime() + 50 * 60 * 1000).toISOString();
   const claimToken = randomToken();
@@ -46,8 +71,11 @@ export const onRequestPost = withDatabase(async ({ request, env }) => {
     WHERE id = (
       SELECT queued.id FROM network_search_jobs AS queued
       WHERE queued.status = 'queued'
+        AND EXISTS (SELECT 1 FROM users WHERE id = queued.user_id AND enabled = 1)
+        AND EXISTS (SELECT 1 FROM network_bindings WHERE user_id = queued.user_id AND status = 'ready')
         AND NOT EXISTS (SELECT 1 FROM network_search_jobs WHERE status = 'running')
         AND NOT EXISTS (SELECT 1 FROM watched_accounts WHERE status = 'running')
+        AND NOT EXISTS (SELECT 1 FROM network_bindings WHERE lease_token_hash IS NOT NULL)
         AND EXISTS (SELECT 1 FROM network_worker_control WHERE id = 1 AND halted = 0)
         AND COALESCE((
           SELECT SUM(CASE WHEN counts_complete = 1 THEN detail_opens ELSE detail_budget END)
@@ -59,35 +87,39 @@ export const onRequestPost = withDatabase(async ({ request, env }) => {
       AND status = 'queued'
       AND NOT EXISTS (SELECT 1 FROM network_search_jobs WHERE status = 'running')
       AND NOT EXISTS (SELECT 1 FROM watched_accounts WHERE status = 'running')
+        AND NOT EXISTS (SELECT 1 FROM network_bindings WHERE lease_token_hash IS NOT NULL)
       AND EXISTS (SELECT 1 FROM network_worker_control WHERE id = 1 AND halted = 0)
       AND COALESCE((
         SELECT SUM(CASE WHEN counts_complete = 1 THEN detail_opens ELSE detail_budget END)
         FROM network_search_jobs WHERE budget_date = ?4
       ), 0) + json_array_length(accounts_json) * 20 <= ${DETAIL_DAILY_LIMIT}
-    RETURNING id, keywords_json, accounts_json, days, window_start_at, created_at,
+    RETURNING id, user_id, keywords_json, accounts_json, days, window_start_at, created_at,
       attempt_count, detail_budget, budget_date
   `).bind(nowIso, leaseExpiresAt, claimHash, budgetDate).first();
   if (!job) {
-    // Older workers must never receive a task they cannot process.
-    if (body?.resolve_accounts !== true) return json({ job: null });
     const account = await env.DB.prepare(`
       UPDATE watched_accounts
       SET status = 'running', lease_expires_at = ?1, claim_token_hash = ?2
       WHERE id = (
         SELECT id FROM watched_accounts WHERE status = 'queued'
+          AND EXISTS (SELECT 1 FROM users WHERE id = watched_accounts.user_id AND enabled = 1)
+          AND EXISTS (SELECT 1 FROM network_bindings WHERE user_id = watched_accounts.user_id AND status = 'ready')
         ORDER BY created_at, id LIMIT 1
       ) AND status = 'queued'
         AND NOT EXISTS (SELECT 1 FROM watched_accounts WHERE status = 'running')
+        AND NOT EXISTS (SELECT 1 FROM network_bindings WHERE lease_token_hash IS NOT NULL)
         AND NOT EXISTS (SELECT 1 FROM network_search_jobs WHERE status = 'running')
         AND EXISTS (SELECT 1 FROM network_worker_control WHERE id = 1 AND halted = 0)
-      RETURNING id, red_id
+      RETURNING id, user_id, red_id
     `).bind(leaseExpiresAt, claimHash).first();
+    const profile = account ? await env.DB.prepare('SELECT profile_id FROM network_bindings WHERE user_id = ?1').bind(account.user_id).first() : null;
     return json({ job: account ? {
-      ...account, kind: 'account_resolution', claim_token: claimToken, lease_expires_at: leaseExpiresAt
+      ...account, profile_id: profile.profile_id, kind: 'account_resolution', claim_token: claimToken, lease_expires_at: leaseExpiresAt
     } : null });
   }
+  const profile = await env.DB.prepare('SELECT profile_id FROM network_bindings WHERE user_id = ?1').bind(job.user_id).first();
   return json({ job: {
-    id: job.id,
+    id: job.id, user_id: job.user_id, profile_id: profile.profile_id,
     claim_token: claimToken,
     keywords: parseArray(job.keywords_json),
     accounts: parseArray(job.accounts_json),

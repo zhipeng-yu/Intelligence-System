@@ -4,6 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import shutil
+import uuid
 import json
 import os
 import re
@@ -39,7 +42,7 @@ HTTP_USER_AGENT = "Ledu-Network-Materials-Worker/1.0"
 ROOT = Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir())) / "LeduSchoolArchive" / "network-worker"
 STATE_PATH = ROOT / "state.json"
 CREDENTIAL_PATH = ROOT / "worker-key.bin"
-PROFILE_PATH = ROOT / "edge-profile"
+PROFILES_PATH = ROOT / "profiles"
 REGISTER_SCRIPT = Path(__file__).with_name("register_network_worker.ps1")
 TASK_NAME = "Ledu-Network-Materials-Worker"
 MAX_RESULTS = 30
@@ -89,13 +92,17 @@ USER_SEARCH_ROWS = r"""() => {
 }"""
 
 
-def resolution_guard(client) -> None:
+def security_guard(client) -> None:
     if client._check_captcha():
         raise WorkerBlocked("小红书需要人工安全验证")
-    page = client.page
     for text in ("安全验证", "请完成验证", "拖动滑块"):
-        if page.get_by_text(text, exact=False).first.is_visible():
+        if client.page.get_by_text(text, exact=False).first.is_visible():
             raise WorkerBlocked("小红书需要人工安全验证")
+
+
+def resolution_guard(client) -> None:
+    security_guard(client)
+    page = client.page
     login = page.locator(".login-container")
     if "/login" in page.url.lower() or (login.count() and login.first.is_visible()):
         raise WorkerBlocked("小红书登录已失效，需人工处理")
@@ -342,7 +349,7 @@ def _payload(status: str, results: list[dict], failures: list[dict], metrics: di
 def _failure(failures: list[dict], account_id: str, error: Exception) -> None:
     if any(item["account_id"] == account_id for item in failures):
         return
-    reason = re.sub(r"\s+", " ", str(error)).strip()[:200] or "账号读取失败"
+    reason = "账号页面暂时无法读取。"
     failures.append({"account_id": account_id, "reason": reason})
 
 
@@ -460,6 +467,87 @@ def process_job(job: dict, account_reader: Callable[[str, dict], tuple[str, list
     )
 
 
+def profile_path(profile_id: str) -> Path:
+    if not isinstance(profile_id, str) or str(uuid.UUID(profile_id)) != profile_id:
+        raise RuntimeError("用户浏览器标识无效")
+    root = PROFILES_PATH.resolve()
+    path = root / profile_id
+    if path.resolve() != path or not path.is_relative_to(root):
+        raise RuntimeError("用户浏览器目录无效")
+    return path
+
+
+def clear_profile(profile_id: str) -> None:
+    path = profile_path(profile_id)
+    if path.exists():
+        shutil.rmtree(path)
+
+
+def process_binding(job: dict, key: str) -> bool:
+    path = profile_path(job["profile_id"])
+    def report(**payload):
+        return api_request("/api/network/worker/binding", key, {
+            "profile_id": job["profile_id"], "claim_token": job["claim_token"], **payload
+        })
+    # Refresh/rebind always starts empty; never copy the retired shared profile.
+    clear_profile(job["profile_id"])
+    if job["status"] == "unbinding":
+        report(status="unbound")
+        return True
+    browser_client, _, login_action, _ = browser_client_type(path, allow_images=True)
+    client = browser_client(headless=True)
+    status = "invalid"
+    deadline = time.monotonic() + 120
+    try:
+        client.start()
+        action = login_action(client)
+        client.navigate("https://www.xiaohongshu.com/explore")
+        qr = client.page.locator(action.QRCODE_SELECTOR).first
+        qr.wait_for(state="visible", timeout=15000)
+        security_guard(client)
+        # Only the QR element, in memory. Never use the skill's shared QR file
+        # or its full-page screenshot fallback.
+        response = report(status="waiting", png=base64.b64encode(qr.screenshot()).decode("ascii"))
+        while response.get("current") and time.monotonic() < deadline:
+            security_guard(client)
+            response = report(heartbeat=True)
+            if not response.get("current"):
+                break
+            logged_in, _ = action.check_login_status(navigate=False)
+            if logged_in:
+                status = "ready"
+                break
+            time.sleep(3)
+        else:
+            status = "expired"
+    except (WorkerBlocked, StopTrial):
+        status = "blocked"
+    except Exception:
+        try:
+            security_guard(client)
+        except Exception:
+            status = "blocked"
+        else:
+            status = "invalid"
+    finally:
+        try:
+            client.close()
+        except Exception:
+            status = "blocked"
+        if status == "blocked":
+            halt_worker(read_state(), "security", "小红书绑定需要人工安全验证")
+        if status != "ready":
+            try:
+                clear_profile(job["profile_id"])
+            except Exception:
+                status = "blocked"
+                halt_worker(read_state(), "security", "用户浏览器清理失败，需人工检查")
+    result = report(status=status)
+    if not result.get("current"):
+        clear_profile(job["profile_id"])
+    return status != "blocked"
+
+
 def run_once() -> bool:
     state = read_state()
     if state.get("halted"):
@@ -469,15 +557,17 @@ def run_once() -> bool:
     key = unprotect_secret(CREDENTIAL_PATH.read_bytes())
     job = None
     try:
-        claimed = api_request("/api/network/worker/claim", key, {"resolve_accounts": True})
+        claimed = api_request("/api/network/worker/claim", key, {"user_sessions": True})
         if claimed.get("halted"):
             halt_worker(state, "security", "服务器已因小红书安全验证停止后续任务")
             return False
         job = claimed.get("job")
         if job is None:
             return True
+        if job.get("kind") == "binding":
+            return process_binding(job, key)
         resolving = job.get("kind") == "account_resolution"
-        browser_client, feed_action, login_action, user_action = browser_client_type(PROFILE_PATH)
+        browser_client, feed_action, login_action, user_action = browser_client_type(profile_path(job["profile_id"]))
         client = browser_client(headless=True)
         started_at = time.monotonic()
         payload = None
@@ -531,9 +621,9 @@ def run_once() -> bool:
         key = ""
 
 
-def repair_login() -> None:
+def repair_login(profile_id: str) -> None:
     state = read_state()
-    browser_client, feed_action, login_action, user_action = browser_client_type(PROFILE_PATH)
+    browser_client, feed_action, login_action, user_action = browser_client_type(profile_path(profile_id))
     client = browser_client(headless=False)
     try:
         client.start()
@@ -557,7 +647,7 @@ def repair_login() -> None:
         raise RuntimeError("本地 NETWORK_WORKER_KEY 凭据未配置")
     key = unprotect_secret(CREDENTIAL_PATH.read_bytes())
     try:
-        api_request("/api/network/worker/claim", key, {"resume": True})
+        api_request("/api/network/worker/claim", key, {"resume": True, "user_sessions": True, "profile_id": profile_id})
     finally:
         key = ""
     state.update({"halted": False, "reason": None, "detail": None, "job_id": None,
@@ -597,24 +687,45 @@ def schedule(repo: Path) -> None:
         raise RuntimeError("Windows 任务计划程序配置失败")
 
 
-def main() -> int:
+def command_main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=("run", "repair-login", "provision-secret", "schedule"))
+    parser.add_argument("--profile-id")
     parser.add_argument("--repo", type=Path, default=Path(__file__).resolve().parents[1])
     args = parser.parse_args()
     try:
         if args.command == "run":
             return 0 if run_once() else 1
         if args.command == "repair-login":
-            repair_login()
+            repair_login(args.profile_id)
         elif args.command == "provision-secret":
             provision_secret(args.repo)
         else:
             schedule(args.repo)
         return 0
     except Exception as error:
-        print(str(error), file=sys.stderr)
+        print("工作器未完成，请检查用户绑定状态及本地运行环境。", file=sys.stderr)
         return 1
+
+
+def main() -> int:
+    import msvcrt
+    ROOT.mkdir(parents=True, exist_ok=True)
+    with (ROOT / "worker.lock").open("a+b") as lock:
+        lock.seek(0)
+        if not lock.read(1):
+            lock.write(b"0")
+            lock.flush()
+        lock.seek(0)
+        try:
+            msvcrt.locking(lock.fileno(), msvcrt.LK_NBLCK, 1)
+        except OSError:
+            return 0
+        try:
+            return command_main()
+        finally:
+            lock.seek(0)
+            msvcrt.locking(lock.fileno(), msvcrt.LK_UNLCK, 1)
 
 
 if __name__ == "__main__":

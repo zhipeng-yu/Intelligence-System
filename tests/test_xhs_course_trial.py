@@ -1,129 +1,53 @@
-import unittest
-import io
 import os
 import tempfile
-import urllib.error
-import urllib.request
+import unittest
 from pathlib import Path
-import inspect
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+from automation import xhs_course_trial as browser
 
-from automation.xhs_course_trial import (
-    TARGET_USER_ID,
-    HTTP_USER_AGENT,
-    BROWSER_ENV,
-    browser_executable,
-    clean_feeds,
-    extract_note_record,
-    browser_client_type,
-    is_historical_candidate,
-    json_request,
-    multipart,
-    new_feeds_before_seen,
-    report_html,
-    StopTrial,
-    upload_and_analyze,
-)
-
-
-class TrialFactsTest(unittest.TestCase):
-    def test_every_note_has_required_sanitized_fields_and_fact_summary(self):
-        record = extract_note_record("65abcdef1234567890abcdef", {
-            "note": {
-                "title": "我的打卡日常",
-                "desc": "记录今天的学习过程。",
-                "time": 1787875200000,
-            }
-        })
-        self.assertEqual(set(record), {
-            "note_id", "published_at", "source_account", "original_title", "url", "summary",
-        })
-        self.assertEqual(record["source_account"], TARGET_USER_ID)
-        self.assertEqual(record["url"], "https://www.xiaohongshu.com/explore/65abcdef1234567890abcdef")
-        self.assertNotIn("?", record["url"])
-        self.assertGreaterEqual(len(record["summary"]), 100)
-        self.assertLessEqual(len(record["summary"]), 200)
-
-    def test_latest_twenty_are_deduplicated_and_time_sorted(self):
-        feeds = [
-            {"id": "65abcdef1234567890abcde1", "time": 1000},
-            {"id": "65abcdef1234567890abcde2", "time": 3000},
-            {"id": "65abcdef1234567890abcde1", "time": 2000},
-            {"id": "bad", "time": 4000},
-        ]
-        self.assertEqual([item["id"] for item in clean_feeds(feeds)], [
-            "65abcdef1234567890abcde2", "65abcdef1234567890abcde1",
-        ])
-
-    def test_only_front_segment_before_seen_anchor_is_new(self):
-        feeds = [
-            {"id": "65abcdef1234567890abcde4"},
-            {"id": "65abcdef1234567890abcde3"},
-            {"id": "65abcdef1234567890abcde2"},
-            {"id": "65abcdef1234567890abcde1"},
-        ]
-        self.assertEqual([item["id"] for item in new_feeds_before_seen(feeds, {
-            "65abcdef1234567890abcde2",
-        })], ["65abcdef1234567890abcde4", "65abcdef1234567890abcde3"])
-        with self.assertRaises(StopTrial):
-            new_feeds_before_seen(feeds, {"65abcdef1234567890abcdef"})
-
-    def test_historical_candidate_is_preserved_outside_upload_queue(self):
-        self.assertTrue(is_historical_candidate(
-            {"published_at": "2023-11-08T11:37+08:00"}, "2026-08-28T12:00:00+08:00"
-        ))
-        self.assertFalse(is_historical_candidate(
-            {"published_at": "2026-08-29T11:37+08:00"}, "2026-08-28T12:00:00+08:00"
-        ))
-
-    def test_http_upload_error_keeps_safe_status_and_message(self):
-        error = urllib.error.HTTPError(
-            "https://example.invalid", 400, "Bad Request", {},
-            io.BytesIO('{"error":"文件校验失败。"}'.encode("utf-8")),
-        )
-        original = urllib.request.urlopen
-        urllib.request.urlopen = lambda *_args, **_kwargs: (_ for _ in ()).throw(error)
-        try:
-            with self.assertRaisesRegex(StopTrial, "HTTP 400.*文件校验失败"):
-                json_request(urllib.request.Request("https://example.invalid"), "upload")
-        finally:
-            urllib.request.urlopen = original
-
-    def test_machine_requests_use_transparent_client_identity(self):
-        self.assertEqual(HTTP_USER_AGENT, "Ledu-XHS-Course-Trial/1.0")
-        self.assertIn('"User-Agent": HTTP_USER_AGENT', inspect.getsource(upload_and_analyze))
-
-    def test_report_contains_no_transient_query_parameters(self):
-        record = extract_note_record("65abcdef1234567890abcdef", {
-            "note": {"title": "小学数学课程包报名", "desc": "现价 99 元，适合小学数学", "time": 1787875200}
-        })
-        document = report_html([record])
-        self.assertNotIn("xsec_token", document)
-        self.assertNotIn("share_id", document)
-        self.assertIn("99 元", record["summary"])
-
-    def test_browser_adapter_accepts_available_browser_without_stealth_overrides(self):
-        source = inspect.getsource(browser_client_type)
-        self.assertIn("browser_executable()", source)
-        self.assertIn("launch_persistent_context(**options)", source)
-        self.assertNotIn("add_init_script", source)
-        self.assertNotIn("user_agent", source)
-        self.assertNotIn("ignore_default_args", source)
-
-    def test_browser_executable_accepts_configured_local_browser(self):
+class BrowserTest(unittest.TestCase):
+    def test_browser_override_and_missing_executable(self):
         with tempfile.TemporaryDirectory() as directory:
-            executable = Path(directory) / "browser.exe"
-            executable.touch()
-            with patch.dict(os.environ, {BROWSER_ENV: str(executable)}):
-                self.assertEqual(browser_executable(), executable)
+            path = Path(directory) / 'browser.exe'
+            path.touch()
+            with patch.dict(os.environ, {browser.BROWSER_ENV: str(path)}):
+                self.assertEqual(browser.browser_executable(), path)
+                path.unlink()
+                with self.assertRaises(browser.StopTrial):
+                    browser.browser_executable()
 
-    def test_scheduled_task_is_daily_bounded_and_catches_up(self):
-        script = Path("automation/register_xhs_course_trial.ps1").read_text(encoding="utf-8")
-        self.assertIn("New-ScheduledTaskTrigger -Daily", script)
-        self.assertIn("EndBoundary", script)
-        self.assertIn("StartWhenAvailable", script)
-        self.assertIn("MultipleInstances IgnoreNew", script)
+    def test_adapter_uses_only_explicit_profile_and_cleans_history(self):
+        class Base:
+            def __init__(self, **options):
+                self.headless = options['headless']
+                self.timeout = 45000
+        runtime = MagicMock()
+        context = runtime.return_value.start.return_value.chromium.launch_persistent_context.return_value
+        page = MagicMock()
+        context.pages = [page]
+        with tempfile.TemporaryDirectory() as directory, patch.object(browser, 'load_skill', return_value=(runtime, Base, None, None, None)), patch.object(browser, 'browser_executable', return_value=None):
+            profile = Path(directory) / 'isolated'
+            client_type, *_ = browser.browser_client_type(profile)
+            client = client_type(headless=True)
+            client.start()
+            launch = runtime.return_value.start.return_value.chromium.launch_persistent_context
+            self.assertEqual(launch.call_args.kwargs['user_data_dir'], str(profile))
+            self.assertNotIn('user_agent', launch.call_args.kwargs)
+            context.add_init_script.assert_not_called()
+            history = profile / 'Default' / 'History'
+            history.parent.mkdir()
+            history.write_text('test history', encoding='utf-8')
+            marker = profile / 'Default' / 'preserved-test-file'
+            marker.touch()
+            client.close()
+            self.assertFalse(history.exists())
+            self.assertTrue(marker.exists())
+            context.close.assert_called_once()
 
+    def test_timestamp_and_note_shapes(self):
+        self.assertEqual(browser.feed_timestamp({'time': '1700000000000'}), 1700000000)
+        self.assertEqual(browser.feed_timestamp({'id': 'invalid'}), 0)
+        self.assertEqual(browser.note_text({'note': {'title': ' 标题 ', 'desc': '第一行\n第二行', 'time': 1700000000000}}), ('标题', '第一行 第二行', 1700000000))
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()

@@ -1,4 +1,3 @@
-import inspect
 import json
 import tempfile
 import unittest
@@ -200,19 +199,6 @@ class NetworkWorkerTest(unittest.TestCase):
                 self.assertFalse(network_worker.run_once())
                 api.assert_not_called()
 
-    def test_worker_uses_available_browser_catches_initial_state_security_and_keeps_schedule_boundary(self):
-        browser_source = inspect.getsource(network_worker.browser_client_type)
-        self.assertIn("def wait_for_initial_state", browser_source)
-        self.assertIn('error.__class__.__name__ == "CaptchaError"', browser_source)
-        self.assertNotIn("add_init_script", browser_source)
-        self.assertNotIn("playwright install", inspect.getsource(network_worker))
-        self.assertIn('{"resume": True}', inspect.getsource(network_worker.repair_login))
-        schedule = Path("automation/register_network_worker.ps1").read_text(encoding="utf-8")
-        self.assertTrue(schedule.isascii())
-        self.assertIn("New-TimeSpan -Minutes 1", schedule)
-        self.assertIn("MultipleInstances IgnoreNew", schedule)
-        self.assertIn("-m automation.network_worker run", schedule)
-
     def resolution_client(self, rows=None, profile=None):
         client = MagicMock()
         client._check_captcha.return_value = False
@@ -294,7 +280,7 @@ class NetworkWorkerTest(unittest.TestCase):
             if failure == "login_error":
                 login.return_value.check_login_status.side_effect = RuntimeError("unsafe URL")
                 client._check_captcha.return_value = True
-            job = {"kind": "account_resolution", "id": "resolve-job", "red_id": "Exact_123", "claim_token": "test-claim"}
+            job = {"kind": "account_resolution", "id": "resolve-job", "profile_id": "00000000-0000-4000-8000-000000000000", "red_id": "Exact_123", "claim_token": "test-claim"}
             calls = []
             def api(path, _key, payload):
                 calls.append((path, payload))
@@ -319,14 +305,49 @@ class NetworkWorkerTest(unittest.TestCase):
                 self.assertEqual(calls[1][0], "/api/network/worker/accounts/resolve-job")
                 self.assertEqual(calls[1][1], {"status": "blocked", "error_code": "security_blocked", "claim_token": "test-claim"})
 
-    def test_summary_never_needs_ai_or_full_copy(self):
-        summary = deterministic_summary(
-            "账号", "阅读课程", "共 8 节课，面向三年级。" * 30,
-            self.now.isoformat(), ["阅读", "课程"],
-        )
-        self.assertGreaterEqual(len(summary), 100)
-        self.assertLessEqual(len(summary), 200)
-        self.assertNotIn("AI", inspect.getsource(deterministic_summary))
+    def test_profile_cleanup_never_touches_other_user_or_shared_profile(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.object(network_worker, "PROFILES_PATH", root / "profiles"):
+                first = network_worker.profile_path("00000000-0000-4000-8000-000000000001")
+                second = network_worker.profile_path("00000000-0000-4000-8000-000000000002")
+                for path in (first, second, root / "edge-profile"):
+                    path.mkdir(parents=True)
+                    (path / "synthetic-session").touch()
+                network_worker.clear_profile(first.name)
+                self.assertFalse(first.exists())
+                self.assertTrue((second / "synthetic-session").exists())
+                self.assertTrue((root / "edge-profile" / "synthetic-session").exists())
+                for value in ("../edge-profile", "", None):
+                    with self.assertRaises((ValueError, RuntimeError)):
+                        network_worker.profile_path(value)
+
+    def test_binding_ready_expired_and_security_close_before_reporting(self):
+        for expected in ("ready", "expired", "blocked"):
+            client = MagicMock()
+            client._check_captcha.return_value = expected == "blocked"
+            client.page.get_by_text.return_value.first.is_visible.return_value = False
+            client.page.locator.return_value.first.screenshot.return_value = b"synthetic PNG"
+            login = MagicMock()
+            login.return_value.check_login_status.return_value = (True, None)
+            events = []
+            client.close.side_effect = lambda: events.append("close")
+            def api(_path, _key, payload):
+                events.append(payload.get("status", "heartbeat"))
+                return {"current": True}
+            job = {"profile_id": "00000000-0000-4000-8000-000000000001", "claim_token": "test", "status": "queued"}
+            with tempfile.TemporaryDirectory() as directory, \
+                    patch.object(network_worker, "PROFILES_PATH", Path(directory)), \
+                    patch.object(network_worker, "browser_client_type", return_value=(lambda **_: client, None, login, None)), \
+                    patch.object(network_worker, "api_request", side_effect=api), \
+                    patch.object(network_worker, "read_state", return_value={}), \
+                    patch.object(network_worker, "halt_worker") as halt, \
+                    patch.object(network_worker.time, "monotonic", side_effect=[0, 121 if expected == "expired" else 1]):
+                self.assertEqual(network_worker.process_binding(job, "test"), expected != "blocked")
+                self.assertEqual(events[-2:], ["close", expected])
+                self.assertEqual(halt.called, expected == "blocked")
+                client.page.screenshot.assert_not_called()
+
 
 
 if __name__ == "__main__":

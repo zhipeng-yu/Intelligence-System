@@ -1,74 +1,49 @@
 # 乐读内部资料库
 
-面向少量内部用户的单校资料与小红书公开资料工具。源码保持一个原生 `index.html`、Cloudflare Pages Functions、D1 和既有私有 R2；没有前端框架、第三方队列、新服务或新增 AI。
+少量内部用户使用的单校资料与小红书公开资料工具。保持单个原生 `index.html`、Pages Functions、D1、私有 R2、既有 Conda 和 Windows 任务计划。
 
-生产地址：<https://ledu-school-archive.pages.dev>
+生产地址：https://ledu-school-archive.pages.dev
 
-“小规模多用户网络资料 MVP”、访问预算优化、“小红书号”异步核验和浏览器自由选择均已部署到生产：Pages 部署 `4310e4b9` 使用源码提交 `6e2ff6f`，远端 D1 已应用到 `0007_resolve_red_ids.sql`，既有 Secret 未修改。真实只读账号核验与有结果检索已验收；新工作器计划任务已恢复，旧七日任务保持禁用。
+## 发布状态
 
-## 登录与权限
+生产仍为部署 `4310e4b9`、源码 `6e2ff6f`、迁移 `0007`，使用共享工作器 profile。2026-09-09 新源码增加每用户隔离扫码绑定及 `0008_user_browser_bindings.sql`，已完成本地模拟验证，**未部署、未切换计划任务、未进行真实扫码验收**。
 
-- 用户输入管理员预先加入白名单的中国大陆 11 位手机号，并通过 Turnstile 登录；没有密码、短信、自助注册或自助注销。
-- D1 只保存手机号 HMAC、末四位、备注和启用状态。会话令牌只以 SHA-256 保存，浏览器使用 12 小时 `Secure`、`HttpOnly`、`SameSite=Strict`、`Path=/` Cookie，不使用 localStorage。
-- 所有用户 API 从会话确定用户身份，不接受客户端 `user_id`。禁用用户立即清除其会话，但保留网络资料。
-- 白名单管理同时要求有效用户会话和现有 `ADMIN_KEY`；原下载、重试、撤销和彻底删除管理操作也保持双重要求。
+用户已确认旧“24 位标准账号 ID”页面在刷新后变为“小红书号”。没有重复修改正确表单，也没有增加刷新脚本；不能据此认定特定缓存或预览域名是根因。
 
-这是内部小规模弱认证：知道某个白名单手机号的人可以冒用该身份，产品已接受此边界。
+## 登录与学校资料
 
-## 学校资料
+手机号白名单与 Turnstile 登录，无密码、短信、自助注册或注销。完整手机号不落库；D1 保存手机号 HMAC、末四位及会话 SHA-256。12 小时安全 Cookie，不将会话放入 localStorage。用户接口从 Cookie 确定身份；敏感管理操作同时要求会话与 `ADMIN_KEY`，禁用用户删除会话但保留历史数据。
 
-- 登录后共享原有八张学校画像卡片。
-- 原第九张“其他产品资料”、历史演示、原文件和数据库记录原样保留，但不出现在学校画像、资料列表或可撤销范围中。
-- 普通上传仍支持 PDF、DOCX、XLSX，单文件最大 50MB；Turnstile、同一网络散列每小时 5 份、扩展名/MIME/文件头校验和每文件一次自动整理均保留。
-- 学校资料继续使用 Workers AI `toMarkdown` 与方舟 Responses API；线性撤销、私有 R2、随机对象键、强制附件下载和彻底删除规则没有放宽。
-- `INGEST_KEY` 仍只能在现有 `POST /api/documents` 绕过 Turnstile，不能获得管理权限。
+学校资料共享八张卡片；第九张 `other_products` 及历史文件保留但隐藏。上传只支持 PDF、DOCX、XLSX，最大 50MB，保留文件校验、Turnstile、网络散列限流、私有 R2、附件下载、线性撤销和彻底删除边界。原学校 AI 整理链路未变。`INGEST_KEY` 只用于既有文档上传权限。
 
-## 网络资料
+## 网络资料（新源码）
 
-- 用户填写个人主页昵称下方、大小写完全一致的“小红书号”；不接受昵称、主页链接或内部 ID。服务端先排队核验，再把唯一匹配主页的稳定 ID 用于后续检索。
-- 每人最多保存 3 个账号（含待核验和失败申请）。账号核验按 Asia/Shanghai 限制为每人每天 3 次、全站每天 20 次，删除申请不会返还当天次数；核验未结束或失败时不能发起检索。
-- 每次输入 1～2 个关键词并选择近 1、3 或 7 日。标题与公开文案规范化后必须同时包含全部关键词。
-- 一个全局串行工作器先汇总每账号最多 20 条主页候选，排除视频、窗口外内容、无效 ID 和缺少当前会话临时参数的候选，再跨账号去重并按标题关键词命中数、发布时间安排详情顺序。标题未命中只后移，不直接排除。
-- 每次最多保存 30 条，按发布时间倒序展示账号名、发布日期、标题、干净公开链接和 100～200 字确定性摘要。
-- 不保存完整文案、媒体、评论、用户资料或临时 token，也不调用 AI。
-- 每人每天最多 3 次，全站每天最多 20 次，每人最多一个活动任务；日期按 Asia/Shanghai 计算，检索窗口固定在任务创建时刻。工作器按实际认领日共享 `180` 次详情预算，认领前按账号数 × 20 原子预留，结束后收敛为实际打开数。
-- 保留每人最近 10 个已结束任务。用户只能查看和删除自己的账号、任务及结果；删除任务级联删除结果。
-- 单账号失败标记 `partial` 并保留其他结果。验证码、登录失效或安全验证会标记 `blocked`、停止后续认领并等待人工显式恢复。
+- 用户先在网络资料页扫码绑定自己的后台登录状态；二维码最多等待两分钟，支持刷新、解绑、重新绑定。访问本站的浏览器不提供小红书 Cookie 给工作器。
+- 每用户使用随机目录标识的独立本机 profile。未绑定或失效时不能核验/检索，不回退共享会话。旧共享 profile 原样保留但不再使用。
+- 用户输入主页显示、大小写完全一致的小红书号，最多保存 3 个关注账号。核验一次用户搜索页前 20 个候选，最多打开一个精确匹配主页。
+- 核验和检索各为每人每日 3 次、全站 20 次；删除核验申请不返还次数。检索为 1～2 个 AND 关键词、近 1/3/7 日、每账号最多 20 条候选、每任务最多 30 条结果。
+- 保留每人最近 10 个结束任务。结果包含账号名、标题、日期、干净公开链接及 100～200 字确定性摘要，不保存完整正文、媒体、评论或临时访问参数，不进入学校画像、R2/PDF 或 AI。
+- 三类工作共用全局串行工作器。绑定使用 3 分钟租约、最多 2 分钟等待；核验/检索继续使用 50 分钟租约、40 分钟详情截止及全站每日 180 次详情预算。已排队的资料任务等待绑定完成，运行中的资料任务阻止更换会话。
+- 验证码、安全验证或登录失效必须 blocked、通知并全局停机。人工恢复命令需要明确的用户 profile 标识：`python -m automation.network_worker repair-login --profile-id <内部随机标识>`。不得自动恢复。
 
-## 本机工作器
+## 二维码暂存
 
-`automation/network_worker.py` 复用既有 Conda 环境和锁定提交 `afa96802d3e61cdd5e7bd7b37ec59182bbe07d37` 对应的 `xiaohongshu-skill`。浏览器可通过 `LEDU_BROWSER_EXECUTABLE` 指定；未指定时自动选择可用的本地 Edge、Chrome 或 Playwright Chromium。工作器不使用 stealth、指纹伪装或验证码绕过。
+页面生成 RSA-OAEP 密钥对，私钥仅留在当前页面内存；工作器只截取二维码元素并经受认证的接口提交，服务端以随机 AES-GCM 密钥加密图片并用页面公钥封装密钥。D1 仅暂存密文、公钥、所有者会话哈希与过期时间；取图需同一有效发起会话。二维码不写本地图片文件或 R2，不返回扫码 token。
 
-工作器使用独立 `NETWORK_WORKER_KEY`。服务端保证账号核验与检索合计全局最多一个运行任务；两者均采用 50 分钟租约和一次性 claim token，工作器在 40 分钟后不再开始新的检索详情访问。账号核验只读取一次用户搜索页的前 20 个可见候选，并最多打开一个完全匹配的主页；过期任务直接结束为 `lease_expired`，不再自动从头重跑；相同回传仍幂等。
+终态、刷新、解绑、禁用、会话失效与过期清除挑战；每次状态查询/工作器认领执行过期清理。停机时密文可能保留到下次清理，但没有服务端持久化私钥可用于解密。页面刷新、退出、离开和二维码过期清除内存密钥及图片。
 
-2026-09-09 首次生产验收使用公开教育账号“学而思网校”（小红书号 `27247756272`），异步核验为 `ready`；关键词“学习”、近 7 日检索正常完成但没有窗口内结果。人工恢复登录后，第二次验收核验“杨老师的陪跑日记”（小红书号 `9522680303`）为 `ready`，相同筛选读取 20 条主页候选，得到 6 条窗口内图文，打开并检查 6 条详情，命中并保存 5 条，任务结束为 `completed / candidates_exhausted`。工作器本地及 D1 停机标志均已清除，计划任务已恢复为每分钟触发、`MultipleInstances IgnoreNew`，空闲轮询返回 0。旧七日任务已禁用但未删除；旧 `seen.json`、运行状态和 `held_candidates` 保持原样。
-
-验证码、登录失效或安全验证会同时写入 D1 全局停机状态和本地停机状态；只有人工 `repair-login` 成功后才显式恢复。页面显示每个结束任务的主页候选、初筛剩余、详情打开、关键词检查、命中和停止原因，并显示今日实际、预留与剩余额度；统计不完整的过期任务保留完整预留且明确标注。为避免删除任务抹掉当天预算，已占用当日预算的任务次日才允许删除。
-
-## 数据与接口
-
-`0005_add_network_materials.sql` 新增 `users`、`sessions`、`watched_accounts`、`network_search_jobs`、`network_search_results`。`0006_add_network_budget_metrics.sql` 为任务表增加预算日、预留额度、漏斗计数、停止原因和计数完整性，并增加单行全局停机控制表。`0007_resolve_red_ids.sql` 原样保留已有账号、任务和结果，为账号增加小红书号、核验状态、租约及不可通过删除绕过的每日申请计数；不保存正文、媒体、评论、用户资料或临时 token。
-
-新增接口仅包括认证、管理员白名单、关注账号、检索任务以及工作器认领/回传，代码位于 `functions/api/auth/`、`functions/api/admin/` 和 `functions/api/network/`。
-
-本地运行需在 Git 忽略的环境中提供 `ADMIN_KEY`、`INGEST_KEY`、`ARK_API_KEY`、`PHONE_PEPPER`、`NETWORK_WORKER_KEY`、`TURNSTILE_SECRET` 和公开的 `TURNSTILE_SITE_KEY`；不得记录这些值。
-
-## 验证
+## 验证与维护
 
 ```powershell
 node --test tests/api.test.mjs
 node --test tests/profile.test.mjs
-node --test tests/network.test.mjs tests/network-resolution.test.mjs
+node --test tests/network.test.mjs tests/network-resolution.test.mjs tests/network-binding.test.mjs
 %LOCALAPPDATA%\LeduSchoolArchive\xhs-course-trial\conda-env\python.exe -m unittest tests/test_xhs_course_trial.py
 %LOCALAPPDATA%\LeduSchoolArchive\xhs-course-trial\conda-env\python.exe -m unittest tests/test_network_worker.py
 npx.cmd wrangler d1 migrations apply ledu-school-archive --local --persist-to .wrangler/state
 npx.cmd wrangler pages functions build
 ```
 
-自动化测试使用模拟响应，不调用真实小红书或真实 AI。GPT 内置浏览器已完成“小红书号”添加、状态展示、格式校验、1280px 桌面、390px、键盘焦点、主导航和控制台验收；无水平溢出且控制台无错误。生产另完成上述两轮真实只读账号核验和检索。截图见 `artifacts/school-archive-desktop.png`。
+本轮 Node 33 项、Python 3+15 项通过，Pages Functions 构建及全新本地 `0001`～`0008` 迁移通过。内置浏览器完成模拟绑定、重新绑定、解绑、桌面、390px、键盘焦点和主导航验证，控制台无错误。截图：`artifacts/school-archive-desktop.png`。本地验收页可用 `node tests/preview-server.mjs` 启动，仅监听本机，全部使用合成数据。
 
-代码仓库：<https://github.com/zhipeng-yu/Intelligence-System>
-
-## 后续规划
-
-下一窗口将完成三项工作：每位内部用户扫码绑定并使用自己的隔离小红书 profile；定位并消除仍可见的旧 24 位账号 ID 页面来源；按 ponytail full 删除小红书部分的确认冗余代码。当前生产仍使用共享 profile，上述规划尚未上线；详细范围见 `new-window-prompt.md`。
+发布操作须另行授权；详见 `AGENTS.md`、`handoff.md` 和 `school-profile-handoff.md`。代码仓库：https://github.com/zhipeng-yu/Intelligence-System

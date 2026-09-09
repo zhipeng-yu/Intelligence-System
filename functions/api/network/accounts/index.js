@@ -25,6 +25,7 @@ export const onRequestPost = withUser(async ({ request, env, user }) => {
     `).bind(id, user.id, number, createdAt).run();
   } catch (error) {
     const message = String(error);
+    if (/binding_required/.test(message)) return json({ error: '请先扫码绑定自己的小红书账号。' }, 409);
     if (/account_slots_full/.test(message)) return json({ error: '每位用户最多保存 3 个账号（含待核验和失败申请）。' }, 409);
     if (/account_work_active/.test(message)) return json({ error: '请等待当前账号核验或检索结束后再添加。' }, 409);
     if (/account_daily_limit/.test(message)) return json({ error: '今日账号核验申请已达上限：每人 3 次，全站 20 次。' }, 429);

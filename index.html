@@ -387,6 +387,13 @@
             <div class="completion" aria-live="polite"><span>今日实际打开详情</span><strong id="networkBudgetText">0 / 180</strong><span class="budget-detail" id="networkBudgetDetail">当前预留 0 · 今日剩余 180</span></div>
           </div>
         </section>
+        <section class="panel section" aria-labelledby="binding-title">
+          <h2 id="binding-title">我的小红书登录</h2>
+          <p class="notice">用小红书 App 扫码后，后台将只使用你的独立登录状态读取公开资料。扫码最多等待两分钟；刷新本页后需重新生成二维码。</p>
+          <p id="bindingStatus" class="notice" role="status" aria-live="polite">未绑定</p>
+          <img id="bindingQr" alt="请用小红书 App 扫描二维码" width="200" height="200" hidden>
+          <div class="update-actions"><button id="bindButton" class="primary-button" type="button">扫码绑定 / 刷新二维码</button><button id="unbindButton" class="action-button" type="button">解绑</button></div>
+        </section>
         <div class="split-grid section">
           <section class="panel" aria-labelledby="accounts-title">
             <h2 id="accounts-title">我的账号</h2>
@@ -441,6 +448,13 @@
     let turnstileId = null;
     let loginTurnstileId = null;
     let turnstileReady = null;
+    let bindingRevision = 0;
+    let bindingKey = null;
+    let bindingRequest = null;
+    let bindingTimer = null;
+    let bindingImage = null;
+    let bindingImageRequest = null;
+    let bindingExpiry = null;
     let accounts = [];
     let searches = [];
     let networkBudget = { limit: 180, actual: 0, reserved: 0, remaining: 180 };
@@ -764,6 +778,83 @@
       }));
     }
 
+    function clearBindingImage() {
+      const image = document.querySelector('#bindingQr');
+      image.hidden = true;
+      image.removeAttribute('src');
+      if (bindingImage) URL.revokeObjectURL(bindingImage);
+      bindingImage = null;
+      bindingImageRequest = null;
+      clearTimeout(bindingExpiry);
+    }
+
+    async function refreshBinding() {
+      const requested = bindingRequest;
+      const data = await (await apiFetch('/api/network/binding')).json();
+      if (requested !== bindingRequest) return;
+      const binding = data.binding;
+      const labels = { unbound: '未绑定', queued: '排队生成二维码', waiting: '等待扫码（两分钟内有效）',
+        ready: '已绑定', expired: '二维码已过期，请重新生成', invalid: '登录失效，请重新绑定或联系管理员',
+        blocked: '安全验证已阻断，请联系管理员人工恢复', unbinding: '正在清理你的登录状态' };
+      document.querySelector('#bindingStatus').textContent = labels[binding.status] || '状态未知';
+      if (binding.status !== 'waiting' || Date.parse(binding.expires_at) <= Date.now()) {
+        clearBindingImage();
+        if (!['queued', 'waiting'].includes(binding.status)) bindingKey = null;
+      } else if (bindingKey && binding.request_id === bindingRequest && binding.challenge
+          && bindingImageRequest !== binding.request_id) {
+        const decode = value => Uint8Array.from(atob(value), c => c.charCodeAt(0));
+        const challenge = binding.challenge;
+        const rawKey = await crypto.subtle.decrypt('RSA-OAEP', bindingKey, decode(challenge.key));
+        const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);
+        const png = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: decode(challenge.iv) }, key, decode(challenge.data));
+        if (requested !== bindingRequest || Date.parse(binding.expires_at) <= Date.now()) return;
+        clearBindingImage();
+        bindingImage = URL.createObjectURL(new Blob([png], { type: 'image/png' }));
+        bindingImageRequest = binding.request_id;
+        const image = document.querySelector('#bindingQr');
+        image.src = bindingImage;
+        image.hidden = false;
+        bindingExpiry = setTimeout(() => { clearBindingImage(); bindingKey = null;
+          document.querySelector('#bindingStatus').textContent = '二维码已过期，请重新生成';
+        }, Math.max(0, Date.parse(binding.expires_at) - Date.now()));
+      }
+      clearTimeout(bindingTimer);
+      if (['queued', 'waiting', 'unbinding'].includes(binding.status)) {
+        bindingTimer = setTimeout(() => refreshBinding().catch(() => {
+          clearBindingImage(); bindingKey = null;
+          document.querySelector('#bindingStatus').textContent = '状态读取失败，请刷新状态';
+        }), 3000);
+      }
+    }
+
+    async function changeBinding(action, button) {
+      const revision = ++bindingRevision;
+      button.disabled = true;
+      clearTimeout(bindingTimer);
+      clearBindingImage();
+      bindingKey = null;
+      bindingRequest = null;
+      try {
+        const body = { action };
+        let privateKey = null;
+        if (action === 'bind') {
+          const pair = await crypto.subtle.generateKey({ name: 'RSA-OAEP', modulusLength: 2048,
+            publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, false, ['encrypt', 'decrypt']);
+          privateKey = pair.privateKey;
+          body.public_key = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.exportKey('spki', pair.publicKey))));
+        }
+        const data = await (await apiFetch('/api/network/binding', jsonRequest('POST', body))).json();
+        if (revision !== bindingRevision) return;
+        bindingKey = privateKey;
+        bindingRequest = data.binding.request_id;
+        await refreshBinding();
+      } catch (error) { document.querySelector('#bindingStatus').textContent = error.message; }
+      finally { button.disabled = false; }
+    }
+    document.querySelector('#bindButton').addEventListener('click', event => changeBinding('bind', event.currentTarget));
+    document.querySelector('#unbindButton').addEventListener('click', event => changeBinding('unbind', event.currentTarget));
+    window.addEventListener('pagehide', () => { bindingRevision++; clearTimeout(bindingTimer); clearBindingImage(); bindingKey = null; bindingRequest = null; });
+
     async function refreshNetwork() {
       const [accountResponse, searchResponse] = await Promise.all([
         apiFetch('/api/network/accounts'), apiFetch('/api/network/searches')
@@ -774,6 +865,7 @@
       networkBudget = searchData.budget || networkBudget;
       renderAccounts();
       renderSearches();
+      await refreshBinding();
     }
 
     async function refreshAdminUsers() {
@@ -975,6 +1067,7 @@
     });
 
     document.querySelector('#logoutButton').addEventListener('click', async () => {
+      bindingRevision++; clearTimeout(bindingTimer); clearBindingImage(); bindingKey = null; bindingRequest = null;
       try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch { /* cookie is cleared by expiry too */ }
       documents = [];
       profile = null;

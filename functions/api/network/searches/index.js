@@ -1,3 +1,4 @@
+import { bindingReady } from '../binding.js';
 import { json, withUser } from '../../../_shared.js';
 import {
   DETAIL_DAILY_LIMIT, normalizedKeywords, parseArray, shanghaiDate, shanghaiDayBounds
@@ -93,6 +94,7 @@ export const onRequestPost = withUser(async ({ request, env, user }) => {
   const keywords = normalizedKeywords(body?.keywords);
   const days = Number(body?.days);
   if (!keywords || ![1, 3, 7].includes(days)) return json({ error: '关键词或日期范围无效。' }, 400);
+  if (!await bindingReady(env, user.id)) return json({ error: '请先扫码绑定自己的小红书账号。' }, 409);
   const { results: accountRows } = await env.DB.prepare(`
     SELECT account_id, status FROM watched_accounts WHERE user_id = ?1 ORDER BY created_at, id
   `).bind(user.id).all();
@@ -111,7 +113,8 @@ export const onRequestPost = withUser(async ({ request, env, user }) => {
       id, user_id, keywords_json, accounts_json, days, window_start_at, created_at, status
     )
     SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, 'queued'
-    WHERE (
+    WHERE EXISTS (SELECT 1 FROM network_bindings WHERE user_id = ?2 AND status = 'ready' AND lease_token_hash IS NULL)
+    AND (
       SELECT COUNT(*) FROM network_search_jobs
       WHERE user_id = ?2 AND created_at >= ?8 AND created_at < ?9
     ) < 3

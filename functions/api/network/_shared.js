@@ -1,10 +1,7 @@
 export const ACCOUNT_ID_PATTERN = /^[0-9a-f]{24}$/;
 export const ENDED_STATUSES = new Set(['completed', 'partial', 'blocked', 'failed']);
 export const DETAIL_DAILY_LIMIT = 180;
-export const TERMINATION_REASONS = new Set([
-  'results_cap', 'detail_budget_exhausted', 'runtime_cutoff',
-  'security_blocked', 'candidates_exhausted', 'worker_failed'
-]);
+
 
 export function accountId(value) {
   if (typeof value !== 'string') return '';
@@ -100,7 +97,7 @@ export function validatedWorkerPayload(body, job) {
     blocked: new Set(['security_blocked']),
     failed: new Set(['worker_failed'])
   };
-  if (!TERMINATION_REASONS.has(terminationReason) || !reasonsByStatus[status].has(terminationReason)) return null;
+  if (!reasonsByStatus[status].has(terminationReason)) return null;
   const accounts = new Set(parseArray(job.accounts_json));
   const seenUrls = new Set();
   const cleanResults = [];
