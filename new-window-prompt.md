@@ -6,7 +6,7 @@
 
 - Pages 部署 `5df53e87`，源码提交 `4162d08`，生产地址 <https://ledu-school-archive.pages.dev>。
 - 远端 D1 已应用 `0001`～`0007`，无待应用迁移；原有账号、任务和结果完整保留，外键检查通过。
-- `Ledu-Network-Materials-Worker` 使用提交 `4162d08`，状态为 `Ready`，每分钟触发、`MultipleInstances IgnoreNew`；验收后的空闲轮询返回 0。
+- `Ledu-Network-Materials-Worker` 使用提交 `4162d08`，注册为每分钟触发、`MultipleInstances IgnoreNew`。2026-09-09 再次筛选时专用 Edge 登录失效，计划任务已禁用，本地 `login` 停机状态与 Windows 通知已写入，等待人工 `repair-login` 显式恢复。
 - `Ledu-Xiaohongshu-Course-Trial` 仍为 `Disabled`，旧 `seen.json`、状态与 `held_candidates` 未改动。
 - 既有 Secret 未修改；未调用真实 AI、未删除旧任务或历史候选，也未执行任何远端删除。
 
@@ -16,7 +16,7 @@
 - 核验结果：`ready`，稳定主页 ID 已确认，错误为空，租约正常关闭。
 - 搜索设置：1 个账号，关键词“学习”，近 7 日；每账号最多 20 条主页候选，每任务最多 30 条结果。
 - 搜索结果：`completed / candidates_exhausted`；主页候选 20，窗口内图文 0，详情打开 0，关键词检查 0，命中与保存结果 0，计数完整。
-- 验收结束后账号核验与检索活动任务均为 0，`network_worker_control.halted = 0`，未出现验证码、登录失效或安全验证。
+- 首次验收结束后账号核验与检索活动任务均为 0，`network_worker_control.halted = 0`。同日再次尝试筛出一条结果时登录失效；阻塞发生前未创建新的核验或搜索任务，D1 仍无活动任务且全局停机状态仍为 0，本机工作器已停机。
 
 ## 已验证
 
