@@ -6,6 +6,6 @@
 
 现行调用：index.html → network binding/accounts/searches → worker claim/callback → network_worker.py → xhs_course_trial.py中保留的浏览器/解析/DPAPI/通知函数 → 固定版xiaohongshu-skill。删除的旧基线/七日采集/PDF/上传AI/恢复/注册代码只在退役入口和旧测试内调用。
 
-设计、挑战清理方式、数据兼容和发布边界以school-profile-handoff.md与handoff.md为准。本轮未触碰生产运行状态、秘密、旧任务或历史文件。
+设计、挑战清理方式、数据兼容和发布边界以school-profile-handoff.md与handoff.md为准。开发阶段未触碰生产；随后经用户“全部授权”完成0008、Pages部署cfa1f6f1及工作器源码切换aa4f3a6，计划任务暂停等待两用户扫码验收。秘密、旧任务和历史文件未修改。
 
 代码、测试与迁移按.js/.mjs/.py/.ps1/.sql/.html统计：6700行→6686行，净减少14行（包括新增本地验收页；不含文档与图片）。

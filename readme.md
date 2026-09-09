@@ -6,7 +6,7 @@
 
 ## 发布状态
 
-生产仍为部署 `4310e4b9`、源码 `6e2ff6f`、迁移 `0007`，使用共享工作器 profile。2026-09-09 新源码增加每用户隔离扫码绑定及 `0008_user_browser_bindings.sql`，已完成本地模拟验证，**未部署、未切换计划任务、未进行真实扫码验收**。
+2026-09-09 经用户明确授权，生产已更新为部署 `cfa1f6f1`、源码 `aa4f3a6`、迁移 `0008`，工作器目录已切换同一源码。新版空闲轮询返回0；**计划任务暂停，等待两个内部用户真实扫码及核验/检索验收**。本地模拟验证已通过，不能等同于真实验收完成。
 
 用户已确认旧“24 位标准账号 ID”页面在刷新后变为“小红书号”。没有重复修改正确表单，也没有增加刷新脚本；不能据此认定特定缓存或预览域名是根因。
 
@@ -46,4 +46,4 @@ npx.cmd wrangler pages functions build
 
 本轮 Node 33 项、Python 3+15 项通过，Pages Functions 构建及全新本地 `0001`～`0008` 迁移通过。内置浏览器完成模拟绑定、重新绑定、解绑、桌面、390px、键盘焦点和主导航验证，控制台无错误。截图：`artifacts/school-archive-desktop.png`。本地验收页可用 `node tests/preview-server.mjs` 启动，仅监听本机，全部使用合成数据。
 
-发布操作须另行授权；详见 `AGENTS.md`、`handoff.md` 和 `school-profile-handoff.md`。代码仓库：https://github.com/zhipeng-yu/Intelligence-System
+本轮生产迁移、发布、工作器切换、真实验收与计划任务恢复已获授权；真实扫码需要用户参与。详见 `AGENTS.md`、`handoff.md` 和 `school-profile-handoff.md`。代码仓库：https://github.com/zhipeng-yu/Intelligence-System
