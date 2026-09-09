@@ -68,3 +68,7 @@ npx.cmd wrangler pages functions build
 自动化测试使用模拟响应，不调用真实小红书或真实 AI。GPT 内置浏览器已完成“小红书号”添加、状态展示、格式校验、1280px 桌面、390px、键盘焦点、主导航和控制台验收；无水平溢出且控制台无错误。生产另完成上述两轮真实只读账号核验和检索。截图见 `artifacts/school-archive-desktop.png`。
 
 代码仓库：<https://github.com/zhipeng-yu/Intelligence-System>
+
+## 后续规划
+
+下一窗口将完成三项工作：每位内部用户扫码绑定并使用自己的隔离小红书 profile；定位并消除仍可见的旧 24 位账号 ID 页面来源；按 ponytail full 删除小红书部分的确认冗余代码。当前生产仍使用共享 profile，上述规划尚未上线；详细范围见 `new-window-prompt.md`。
