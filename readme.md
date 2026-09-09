@@ -4,9 +4,7 @@
 
 生产地址：<https://ledu-school-archive.pages.dev>
 
-“小规模多用户网络资料 MVP”与访问预算优化均已部署到生产：Pages 部署 `1693b189` 使用源码提交 `4ea51be`，远端 D1 已应用到 `0006_add_network_budget_metrics.sql`，所需 Secret 已配置。真实只读 Edge 检索已验收；新工作器为每分钟 `IgnoreNew` 且状态 `Ready`，旧七日任务保持禁用。
-
-当前 `main` 已增加“小红书号”异步核验源码和 `0007_resolve_red_ids.sql`，尚未迁移或部署到生产，也未切换计划任务所用源码或执行真实核验。
+“小规模多用户网络资料 MVP”、访问预算优化和“小红书号”异步核验均已部署到生产：Pages 部署 `5df53e87` 使用源码提交 `4162d08`，远端 D1 已应用到 `0007_resolve_red_ids.sql`，既有 Secret 未修改。真实只读账号核验与检索均已验收；工作器为每分钟 `IgnoreNew` 且状态 `Ready`，旧七日任务保持禁用。
 
 ## 登录与权限
 
@@ -43,7 +41,7 @@
 
 工作器使用独立 `NETWORK_WORKER_KEY`。服务端保证账号核验与检索合计全局最多一个运行任务；两者均采用 50 分钟租约和一次性 claim token，工作器在 40 分钟后不再开始新的检索详情访问。账号核验只读取一次用户搜索页的前 20 个可见候选，并最多打开一个完全匹配的主页；过期任务直接结束为 `lease_expired`，不再自动从头重跑；相同回传仍幂等。
 
-新任务首次自动触发后成功处理 2 个账号的队列任务，状态为 `completed`，无账号失败或安全验证，未命中结果。访问预算优化上线后，工作器首次空闲轮询返回 0，本地与 D1 均未停机。旧七日任务已禁用但未删除；旧 `seen.json`、运行状态和 `held_candidates` 保持原样。
+2026-09-09 生产验收使用公开教育账号“学而思网校”（小红书号 `27247756272`），异步核验为 `ready`。随后以关键词“学习”、近 7 日检索：读取 20 条主页候选，窗口内图文为 0，未打开详情、未保存结果，任务正常结束为 `completed / candidates_exhausted`。之后空闲轮询返回 0，本地与 D1 均未停机。旧七日任务已禁用但未删除；旧 `seen.json`、运行状态和 `held_candidates` 保持原样。
 
 验证码、登录失效或安全验证会同时写入 D1 全局停机状态和本地停机状态；只有人工 `repair-login` 成功后才显式恢复。页面显示每个结束任务的主页候选、初筛剩余、详情打开、关键词检查、命中和停止原因，并显示今日实际、预留与剩余额度；统计不完整的过期任务保留完整预留且明确标注。为避免删除任务抹掉当天预算，已占用当日预算的任务次日才允许删除。
 
@@ -67,6 +65,6 @@ npx.cmd wrangler d1 migrations apply ledu-school-archive --local --persist-to .w
 npx.cmd wrangler pages functions build
 ```
 
-测试使用模拟响应，不访问真实小红书或调用真实 AI。GPT 内置浏览器已完成“小红书号”添加、状态展示、格式校验、1280px 桌面、390px、键盘焦点、主导航和控制台验收；无水平溢出且控制台无错误。截图见 `artifacts/school-archive-desktop.png`。
+自动化测试使用模拟响应，不调用真实小红书或真实 AI。GPT 内置浏览器已完成“小红书号”添加、状态展示、格式校验、1280px 桌面、390px、键盘焦点、主导航和控制台验收；无水平溢出且控制台无错误。生产另完成上述一次真实只读账号核验和检索。截图见 `artifacts/school-archive-desktop.png`。
 
 代码仓库：<https://github.com/zhipeng-yu/Intelligence-System>
