@@ -48,6 +48,7 @@ export async function fixture(t, legacy = false, bound = true) {
   }
   db.sql.exec(readFileSync(new URL('../migrations/0007_resolve_red_ids.sql', import.meta.url), 'utf8'));
   db.sql.exec(readFileSync(new URL('../migrations/0008_user_browser_bindings.sql', import.meta.url), 'utf8'));
+  db.sql.exec(readFileSync(new URL('../migrations/0009_teaching_diagnoses.sql', import.meta.url), 'utf8'));
   if (bound) for (let index = 0; index < 8; index++) db.sql.prepare(`INSERT INTO network_bindings
     (user_id,profile_id,request_id,status,created_at) VALUES (?,?,?,'ready','2026-01-01')`)
     .run(`u${index}`, `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`, `request-${index}`);

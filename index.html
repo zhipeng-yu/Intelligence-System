@@ -77,6 +77,7 @@
     .side-nav { display: grid; gap: 5px; }
     .side-nav button {
       width: 100%;
+      min-height: 44px;
       padding: 11px 13px;
       color: rgba(255, 255, 255, .72);
       text-align: left;
@@ -213,6 +214,34 @@
     .result-meta { color: var(--ink-soft); font-size: 10px; }
     .failure-list { margin: 10px 0 0; color: var(--red-dark); }
 
+    .diagnosis-layout { display: grid; grid-template-columns: minmax(210px, .35fr) minmax(0, 1fr); align-items: start; gap: 14px; }
+    .diagnosis-history h3 { margin-bottom: 10px; }
+    .diagnosis-case-list { display: grid; gap: 7px; }
+    .diagnosis-case {
+      width: 100%; min-height: 66px; padding: 11px 12px; text-align: left;
+      background: var(--white); border: 1px solid var(--line); cursor: pointer;
+    }
+    .diagnosis-case:hover, .diagnosis-case.active { border-color: var(--red); box-shadow: inset 4px 0 var(--red); }
+    .diagnosis-case strong, .diagnosis-case span { display: block; }
+    .diagnosis-case span { margin-top: 4px; color: var(--ink-soft); font-size: 10px; }
+    .diagnosis-original { margin: 15px 0; padding: 13px 15px; background: var(--paper); border-left: 3px solid var(--red); }
+    .diagnosis-original strong { display: block; margin-bottom: 4px; }
+    .diagnosis-interview { display: grid; gap: 10px; margin: 18px 0; }
+    .diagnosis-message { max-width: 86%; padding: 12px 14px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--paper); border-left: 3px solid var(--red); }
+    .diagnosis-message.teaching { justify-self: end; background: var(--white); border: 1px solid var(--line); border-left: 1px solid var(--line); }
+    .diagnosis-message strong { display: block; margin-bottom: 5px; color: var(--red-dark); font-size: 10px; letter-spacing: .08em; }
+    .diagnosis-answer { padding-top: 16px; border-top: 1px solid var(--line); }
+    .diagnosis-result { padding: 18px; background: var(--paper); border-top: 4px solid var(--red); }
+    .diagnosis-result h3 { margin-bottom: 14px; }
+    .diagnosis-result h4 { margin: 14px 0 5px; color: var(--red-dark); font-size: 11px; letter-spacing: .08em; }
+    .diagnosis-result p, .diagnosis-result ul { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .diagnosis-result ul { padding-left: 20px; }
+    dialog { width: min(560px, calc(100% - 30px)); padding: 0; color: var(--ink); background: var(--paper); border: 1px solid var(--ink); box-shadow: var(--shadow); }
+    dialog::backdrop { background: rgba(18, 42, 46, .58); }
+    .dialog-panel { padding: 24px; }
+    .dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; margin-bottom: 18px; }
+    .summary > .primary-button { align-self: center; color: var(--white); background: var(--red); border-color: var(--white); }
+
     .updates { display: grid; gap: 9px; }
     .update-row { align-items: flex-start; padding: 16px 18px; background: rgba(255, 253, 248, .9); border: 1px solid var(--line); }
     .update-copy { min-width: 0; }
@@ -249,9 +278,11 @@
       .topbar, .section-heading, .summary, .update-row, .footer { align-items: flex-start; }
       .summary, .update-row, .footer { flex-direction: column; }
       .completion { width: 100%; }
-      .profile-grid, .upload-form, .split-grid, .compact-form.two-column { grid-template-columns: 1fr; }
+      .profile-grid, .upload-form, .split-grid, .compact-form.two-column,
+      .diagnosis-layout { grid-template-columns: 1fr; }
       .upload-submit { grid-template-columns: 1fr; }
       .primary-button { width: 100%; }
+      .diagnosis-message { max-width: 94%; }
     }
 
     @media (max-width: 430px) {
@@ -293,8 +324,9 @@
       </div>
       <p class="side-label">一级板块</p>
       <nav class="side-nav">
-        <button class="active" id="schoolNav" type="button" data-view="school" data-short="校"><span>学校资料</span></button>
+        <button class="active" id="schoolNav" type="button" data-view="school" data-short="校" aria-current="page"><span>学校资料</span></button>
         <button id="networkNav" type="button" data-view="network" data-short="网"><span>网络资料</span></button>
+        <button id="diagnosisNav" type="button" data-view="diagnosis" data-short="诊"><span>教学诊断</span></button>
       </nav>
       <div class="side-note"><span>学校画像 2.0</span><p>上传一次，<br>信息自动整理。</p></div>
       <span class="mobile-context">目标学校A · 学校画像</span>
@@ -424,12 +456,61 @@
         </section>
       </div>
 
+      <div id="diagnosisView" hidden>
+        <section aria-labelledby="diagnosis-title">
+          <div class="summary">
+            <div class="summary-copy"><span class="eyebrow">TEACHING DIAGNOSIS</span><h2 id="diagnosis-title">教学诊断</h2><p>把已经发现的异常指标和证据告诉 AI。AI 会逐题询问教学人员，定位主讲老师的具体问题后给出结论并结束。</p></div>
+            <button class="primary-button" id="newDiagnosisButton" type="button">开始一次诊断</button>
+          </div>
+        </section>
+        <div class="diagnosis-layout section">
+          <section class="panel diagnosis-history" aria-labelledby="diagnosis-history-title">
+            <h3 id="diagnosis-history-title">最近诊断</h3>
+            <div class="diagnosis-case-list" id="diagnosisList"></div>
+          </section>
+          <section class="panel" id="diagnosisWorkspace" aria-labelledby="diagnosisCaseTitle" hidden>
+            <div class="section-heading">
+              <div><span class="eyebrow" id="diagnosisCaseType"></span><h2 id="diagnosisCaseTitle"></h2></div>
+              <span class="status" id="diagnosisCaseStatus"></span>
+            </div>
+            <div class="diagnosis-original"><strong>教学提供的异常指标和证据</strong><span id="diagnosisOriginalFact"></span></div>
+            <div class="diagnosis-interview" id="diagnosisInterview" aria-live="polite"></div>
+            <form class="compact-form diagnosis-answer" id="diagnosisAnswerForm">
+              <div class="form-field"><label for="diagnosisAnswer">回答 AI 当前的问题</label><textarea id="diagnosisAnswer" maxlength="4000" required></textarea></div>
+              <p class="notice">请概括事实和证据，不粘贴完整聊天记录，不填写学生姓名、手机号或个人成绩。</p>
+              <button class="primary-button" id="sendDiagnosisAnswer" type="submit">回答并继续</button>
+            </form>
+            <article class="diagnosis-result" id="diagnosisResult" tabindex="-1" hidden>
+              <span class="eyebrow">DIAGNOSIS COMPLETE</span><h3>诊断结论</h3>
+              <h4>发现的问题</h4><p id="diagnosisProblem"></p>
+              <h4>关键证据</h4><ul id="diagnosisEvidence"></ul>
+              <h4>判断</h4><p id="diagnosisJudgment"></p>
+              <h4>仍存疑点</h4><p id="diagnosisUncertainty"></p>
+            </article>
+            <p class="notice" id="diagnosisMessage" role="status" aria-live="polite"></p>
+          </section>
+        </div>
+      </div>
+
       <footer class="footer">
         <span>乐读内部资料库 · 小规模多用户 MVP</span>
         <span>用户隔离 · 私有文件 · 串行检索</span>
       </footer>
     </main>
   </div>
+
+  <dialog id="diagnosisDialog" aria-labelledby="new-diagnosis-title">
+    <div class="dialog-panel">
+      <div class="dialog-heading"><div><span class="eyebrow">START</span><h2 id="new-diagnosis-title">开始教学诊断</h2></div><button class="action-button" id="closeDiagnosisDialog" type="button">关闭</button></div>
+      <form class="compact-form" id="newDiagnosisForm">
+        <div class="form-field"><label for="diagnosisName">老师或案例名称</label><input id="diagnosisName" maxlength="120" required></div>
+        <div class="form-field"><label for="anomalyType">异常类型</label><select id="anomalyType"><option value="homework">作业</option><option value="attendance">出勤</option><option value="refund_complaint">退费/投诉</option></select></div>
+        <div class="form-field"><label for="anomalyFact">已发现的异常指标和证据</label><textarea id="anomalyFact" maxlength="4000" required></textarea></div>
+        <button class="primary-button" type="submit">让 AI 开始提问</button>
+        <p class="notice" id="newDiagnosisMessage" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </dialog>
 
   <script>
     const STORAGE_KEY = 'school_archive_admin_key';
@@ -458,6 +539,10 @@
     let accounts = [];
     let searches = [];
     let networkBudget = { limit: 180, actual: 0, reserved: 0, remaining: 180 };
+    let diagnoses = [];
+    let selectedDiagnosisId = '';
+    const ANOMALY_LABELS = { homework: '作业', attendance: '出勤', refund_complaint: '退费/投诉' };
+    const DIAGNOSIS_STATUS_LABELS = { active: 'AI 诊断中', completed: '诊断完成' };
 
     try {
       adminKey = urlKey || localStorage.getItem(STORAGE_KEY) || '';
@@ -486,6 +571,7 @@
     const phoneInput = document.querySelector('#phoneInput');
     const schoolView = document.querySelector('#schoolView');
     const networkView = document.querySelector('#networkView');
+    const diagnosisView = document.querySelector('#diagnosisView');
     const accountList = document.querySelector('#accountList');
     const accountMessage = document.querySelector('#accountMessage');
     const searchList = document.querySelector('#searchList');
@@ -495,6 +581,11 @@
     const adminUsers = document.querySelector('#adminUsers');
     const adminUserList = document.querySelector('#adminUserList');
     const adminMessage = document.querySelector('#adminMessage');
+    const diagnosisWorkspace = document.querySelector('#diagnosisWorkspace');
+    const diagnosisAnswerForm = document.querySelector('#diagnosisAnswerForm');
+    const diagnosisResult = document.querySelector('#diagnosisResult');
+    const diagnosisMessage = document.querySelector('#diagnosisMessage');
+    const diagnosisDialog = document.querySelector('#diagnosisDialog');
 
     class ApiError extends Error {
       constructor(message, status) { super(message); this.status = status; }
@@ -762,6 +853,67 @@
         }
         return row;
       }));
+    }
+
+    function selectedDiagnosis() {
+      return diagnoses.find(item => item.id === selectedDiagnosisId) || null;
+    }
+
+    function diagnosisCaseButton(item) {
+      const button = node('button', '', `diagnosis-case${item.id === selectedDiagnosisId ? ' active' : ''}`);
+      button.type = 'button';
+      button.setAttribute('aria-pressed', String(item.id === selectedDiagnosisId));
+      button.append(node('strong', item.name));
+      const detail = `${ANOMALY_LABELS[item.anomaly_type]} · ${DIAGNOSIS_STATUS_LABELS[item.status]} · ${formatDate(item.updated_at)}`;
+      button.append(node('span', detail));
+      button.addEventListener('click', () => {
+        selectedDiagnosisId = item.id;
+        renderDiagnoses();
+        diagnosisWorkspace.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      return button;
+    }
+
+    function renderDiagnosisWorkspace() {
+      const item = selectedDiagnosis();
+      diagnosisWorkspace.hidden = !item;
+      if (!item) return;
+      document.querySelector('#diagnosisCaseType').textContent = ANOMALY_LABELS[item.anomaly_type];
+      document.querySelector('#diagnosisCaseTitle').textContent = item.name;
+      document.querySelector('#diagnosisCaseStatus').textContent = DIAGNOSIS_STATUS_LABELS[item.status];
+      document.querySelector('#diagnosisCaseStatus').className = `status ${item.status === 'completed' ? 'completed' : 'processing'}`;
+      document.querySelector('#diagnosisOriginalFact').textContent = item.anomaly_fact;
+      showMessage(diagnosisMessage);
+      document.querySelector('#diagnosisInterview').replaceChildren(...item.messages.map(message => {
+        const bubble = node('div', '', `diagnosis-message${message.role === 'user' ? ' teaching' : ''}`);
+        bubble.append(node('strong', message.role === 'user' ? '教学' : 'AI'), node('span', message.content));
+        return bubble;
+      }));
+      diagnosisAnswerForm.hidden = item.status === 'completed';
+      diagnosisResult.hidden = item.status !== 'completed';
+      if (item.status === 'completed') {
+        document.querySelector('#diagnosisProblem').textContent = item.problem;
+        document.querySelector('#diagnosisEvidence').replaceChildren(...item.evidence.map(value => node('li', value)));
+        document.querySelector('#diagnosisJudgment').textContent = item.judgment;
+        document.querySelector('#diagnosisUncertainty').textContent = item.uncertainty || '无';
+      }
+    }
+
+    function renderDiagnoses() {
+      const list = document.querySelector('#diagnosisList');
+      list.replaceChildren(...(diagnoses.length
+        ? diagnoses.map(diagnosisCaseButton)
+        : [node('div', '暂无诊断。', 'empty-state')]));
+      renderDiagnosisWorkspace();
+    }
+
+    async function refreshDiagnoses() {
+      const data = await (await apiFetch('/api/diagnoses')).json();
+      diagnoses = Array.isArray(data.diagnoses) ? data.diagnoses : [];
+      if (!diagnoses.some(item => item.id === selectedDiagnosisId)) {
+        selectedDiagnosisId = diagnoses[0]?.id || '';
+      }
+      renderDiagnoses();
     }
 
     function renderAdminUsers(users) {
@@ -1073,6 +1225,8 @@
       profile = null;
       accounts = [];
       searches = [];
+      diagnoses = [];
+      selectedDiagnosisId = '';
       networkBudget = { limit: 180, actual: 0, reserved: 0, remaining: 180 };
       isAdmin = false;
       await showLogin();
@@ -1117,6 +1271,57 @@
       } catch (error) { showMessage(searchMessage, error.message, 'error'); }
     });
 
+    document.querySelector('#newDiagnosisButton').addEventListener('click', () => {
+      showMessage(document.querySelector('#newDiagnosisMessage'));
+      diagnosisDialog.showModal();
+      document.querySelector('#diagnosisName').focus();
+    });
+    document.querySelector('#closeDiagnosisDialog').addEventListener('click', () => diagnosisDialog.close());
+    document.querySelector('#newDiagnosisForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const button = form.querySelector('button[type="submit"]');
+      button.disabled = true;
+      try {
+        const data = await (await apiFetch('/api/diagnoses', jsonRequest('POST', {
+          name: document.querySelector('#diagnosisName').value,
+          anomaly_type: document.querySelector('#anomalyType').value,
+          anomaly_fact: document.querySelector('#anomalyFact').value
+        }))).json();
+        diagnoses.unshift(data.diagnosis);
+        selectedDiagnosisId = data.diagnosis.id;
+        form.reset();
+        diagnosisDialog.close();
+        renderDiagnoses();
+        diagnosisWorkspace.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.querySelector('#diagnosisAnswer').focus();
+      } catch (error) { showMessage(document.querySelector('#newDiagnosisMessage'), error.message, 'error'); }
+      finally { button.disabled = false; }
+    });
+
+    diagnosisAnswerForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      const item = selectedDiagnosis();
+      if (!item) return;
+      const answer = document.querySelector('#diagnosisAnswer');
+      const button = document.querySelector('#sendDiagnosisAnswer');
+      button.disabled = true;
+      showMessage(diagnosisMessage, 'AI 正在分析并决定下一问…');
+      try {
+        const data = await (await apiFetch(`/api/diagnoses/${encodeURIComponent(item.id)}`, jsonRequest('PATCH', { answer: answer.value }))).json();
+        diagnoses = diagnoses.map(value => value.id === data.diagnosis.id ? data.diagnosis : value);
+        answer.value = '';
+        renderDiagnoses();
+        if (data.diagnosis.status === 'completed') {
+          showMessage(diagnosisMessage, '诊断已完成。', 'success');
+          diagnosisResult.focus();
+        } else {
+          answer.focus();
+        }
+      } catch (error) { showMessage(diagnosisMessage, error.message, 'error'); }
+      finally { button.disabled = false; }
+    });
+
     document.querySelector('#adminUserForm').addEventListener('submit', async event => {
       event.preventDefault();
       const phone = document.querySelector('#adminPhoneInput');
@@ -1131,14 +1336,23 @@
     });
 
     document.querySelectorAll('.side-nav button').forEach(button => button.addEventListener('click', async () => {
-      const network = button.dataset.view === 'network';
-      schoolView.hidden = network;
-      networkView.hidden = !network;
-      document.querySelector('#pageTitle').textContent = network ? '网络资料' : '学校资料';
-      document.querySelector('.mobile-context').textContent = network ? '网络资料' : '目标学校A · 学校资料';
-      document.querySelectorAll('.side-nav button').forEach(item => item.classList.toggle('active', item === button));
-      if (network) {
+      const view = button.dataset.view;
+      schoolView.hidden = view !== 'school';
+      networkView.hidden = view !== 'network';
+      diagnosisView.hidden = view !== 'diagnosis';
+      const labels = { school: '学校资料', network: '网络资料', diagnosis: '教学诊断' };
+      document.querySelector('#pageTitle').textContent = labels[view];
+      document.querySelector('.mobile-context').textContent = view === 'school' ? '目标学校A · 学校资料' : labels[view];
+      document.querySelectorAll('.side-nav button').forEach(item => {
+        item.classList.toggle('active', item === button);
+        if (item === button) item.setAttribute('aria-current', 'page');
+        else item.removeAttribute('aria-current');
+      });
+      if (view === 'network') {
         try { await refreshNetwork(); } catch (error) { showMessage(searchMessage, error.message, 'error'); }
+      }
+      if (view === 'diagnosis') {
+        try { await refreshDiagnoses(); } catch (error) { showMessage(diagnosisMessage, error.message, 'error'); }
       }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }));
