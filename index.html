@@ -459,7 +459,7 @@
       <div id="diagnosisView" hidden>
         <section aria-labelledby="diagnosis-title">
           <div class="summary">
-            <div class="summary-copy"><span class="eyebrow">TEACHING DIAGNOSIS</span><h2 id="diagnosis-title">教学诊断</h2><p>把已经发现的异常指标和证据告诉 AI。AI 会逐题询问教学人员，定位主讲老师的具体问题后给出结论并结束。</p></div>
+            <div class="summary-copy"><span class="eyebrow">TEACHING DIAGNOSIS</span><h2 id="diagnosis-title">教学诊断</h2><p>说说你已发现的问题或现象。AI 会根据回答追问具体场景，帮你找出主讲老师可改进的环节和解决办法。</p></div>
             <button class="primary-button" id="newDiagnosisButton" type="button">开始一次诊断</button>
           </div>
         </section>
@@ -470,10 +470,10 @@
           </section>
           <section class="panel" id="diagnosisWorkspace" aria-labelledby="diagnosisCaseTitle" hidden>
             <div class="section-heading">
-              <div><span class="eyebrow" id="diagnosisCaseType"></span><h2 id="diagnosisCaseTitle"></h2></div>
+              <div><span class="eyebrow">案例</span><h2 id="diagnosisCaseTitle"></h2></div>
               <span class="status" id="diagnosisCaseStatus"></span>
             </div>
-            <div class="diagnosis-original"><strong>教学提供的异常指标和证据</strong><span id="diagnosisOriginalFact"></span></div>
+            <div class="diagnosis-original"><strong>已发现的现象</strong><span id="diagnosisOriginalFact"></span></div>
             <div class="diagnosis-interview" id="diagnosisInterview" aria-live="polite"></div>
             <form class="compact-form diagnosis-answer" id="diagnosisAnswerForm">
               <div class="form-field"><label for="diagnosisAnswer">回答 AI 当前的问题</label><textarea id="diagnosisAnswer" maxlength="4000" required></textarea></div>
@@ -483,9 +483,9 @@
             <article class="diagnosis-result" id="diagnosisResult" tabindex="-1" hidden>
               <span class="eyebrow">DIAGNOSIS COMPLETE</span><h3>诊断结论</h3>
               <h4>发现的问题</h4><p id="diagnosisProblem"></p>
-              <h4>关键证据</h4><ul id="diagnosisEvidence"></ul>
-              <h4>判断</h4><p id="diagnosisJudgment"></p>
-              <h4>仍存疑点</h4><p id="diagnosisUncertainty"></p>
+              <h4>判断依据</h4><ul id="diagnosisEvidence"></ul>
+              <h4>解决办法</h4><p id="diagnosisSolution"></p>
+              <h4>如何确认有效</h4><p id="diagnosisVerification"></p>
             </article>
             <p class="notice" id="diagnosisMessage" role="status" aria-live="polite"></p>
           </section>
@@ -504,8 +504,8 @@
       <div class="dialog-heading"><div><span class="eyebrow">START</span><h2 id="new-diagnosis-title">开始教学诊断</h2></div><button class="action-button" id="closeDiagnosisDialog" type="button">关闭</button></div>
       <form class="compact-form" id="newDiagnosisForm">
         <div class="form-field"><label for="diagnosisName">老师或案例名称</label><input id="diagnosisName" maxlength="120" required></div>
-        <div class="form-field"><label for="anomalyType">异常类型</label><select id="anomalyType"><option value="homework">作业</option><option value="attendance">出勤</option><option value="refund_complaint">退费/投诉</option></select></div>
-        <div class="form-field"><label for="anomalyFact">已发现的异常指标和证据</label><textarea id="anomalyFact" maxlength="4000" required></textarea></div>
+        <div class="form-field"><label for="diagnosisPhenomenon">你已发现什么问题或现象？</label><textarea id="diagnosisPhenomenon" maxlength="4000" required></textarea></div>
+        <p class="notice">用自己的话简述即可，无需重新录入大量数据；请勿填写学生姓名、手机号或个人成绩。</p>
         <button class="primary-button" type="submit">让 AI 开始提问</button>
         <p class="notice" id="newDiagnosisMessage" role="status" aria-live="polite"></p>
       </form>
@@ -541,7 +541,6 @@
     let networkBudget = { limit: 180, actual: 0, reserved: 0, remaining: 180 };
     let diagnoses = [];
     let selectedDiagnosisId = '';
-    const ANOMALY_LABELS = { homework: '作业', attendance: '出勤', refund_complaint: '退费/投诉' };
     const DIAGNOSIS_STATUS_LABELS = { active: 'AI 诊断中', completed: '诊断完成' };
 
     try {
@@ -864,7 +863,7 @@
       button.type = 'button';
       button.setAttribute('aria-pressed', String(item.id === selectedDiagnosisId));
       button.append(node('strong', item.name));
-      const detail = `${ANOMALY_LABELS[item.anomaly_type]} · ${DIAGNOSIS_STATUS_LABELS[item.status]} · ${formatDate(item.updated_at)}`;
+      const detail = `${DIAGNOSIS_STATUS_LABELS[item.status]} · ${formatDate(item.updated_at)}`;
       button.append(node('span', detail));
       button.addEventListener('click', () => {
         selectedDiagnosisId = item.id;
@@ -878,11 +877,10 @@
       const item = selectedDiagnosis();
       diagnosisWorkspace.hidden = !item;
       if (!item) return;
-      document.querySelector('#diagnosisCaseType').textContent = ANOMALY_LABELS[item.anomaly_type];
       document.querySelector('#diagnosisCaseTitle').textContent = item.name;
       document.querySelector('#diagnosisCaseStatus').textContent = DIAGNOSIS_STATUS_LABELS[item.status];
       document.querySelector('#diagnosisCaseStatus').className = `status ${item.status === 'completed' ? 'completed' : 'processing'}`;
-      document.querySelector('#diagnosisOriginalFact').textContent = item.anomaly_fact;
+      document.querySelector('#diagnosisOriginalFact').textContent = item.phenomenon;
       showMessage(diagnosisMessage);
       document.querySelector('#diagnosisInterview').replaceChildren(...item.messages.map(message => {
         const bubble = node('div', '', `diagnosis-message${message.role === 'user' ? ' teaching' : ''}`);
@@ -894,8 +892,8 @@
       if (item.status === 'completed') {
         document.querySelector('#diagnosisProblem').textContent = item.problem;
         document.querySelector('#diagnosisEvidence').replaceChildren(...item.evidence.map(value => node('li', value)));
-        document.querySelector('#diagnosisJudgment').textContent = item.judgment;
-        document.querySelector('#diagnosisUncertainty').textContent = item.uncertainty || '无';
+        document.querySelector('#diagnosisSolution').textContent = item.solution;
+        document.querySelector('#diagnosisVerification').textContent = item.verification;
       }
     }
 
@@ -1285,8 +1283,7 @@
       try {
         const data = await (await apiFetch('/api/diagnoses', jsonRequest('POST', {
           name: document.querySelector('#diagnosisName').value,
-          anomaly_type: document.querySelector('#anomalyType').value,
-          anomaly_fact: document.querySelector('#anomalyFact').value
+          phenomenon: document.querySelector('#diagnosisPhenomenon').value
         }))).json();
         diagnoses.unshift(data.diagnosis);
         selectedDiagnosisId = data.diagnosis.id;

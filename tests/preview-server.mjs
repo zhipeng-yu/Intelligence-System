@@ -13,24 +13,25 @@ import { onRequestPatch as updateDiagnosis } from '../functions/api/diagnoses/[i
 const { env, call } = await fixture({ after() {} }, false, false);
 env.BUCKET = {};
 const aiTurns = [
-  { status: 'question', question: '未提交学生是否集中在固定学生或班级？', problem: '', evidence: [], judgment: '', uncertainty: '' },
-  { status: 'question', question: '老师对这些未交学生采取了哪些提醒或跟进方式？', problem: '', evidence: [], judgment: '', uncertainty: '' },
+  { status: 'question', question: '这几名未交学生是否一直是同一批？', problem: '', evidence: [], solution: '', verification: '' },
+  { status: 'question', question: '老师对这些固定未交学生具体做过什么？', problem: '', evidence: [], solution: '', verification: '' },
   { status: 'complete', question: '', problem: '主讲老师只做了群提醒，没有跟进固定未交学生',
-    evidence: ['未交集中在固定 6 名学生', '作业难度和同期出勤没有变化', '老师没有逐一联系'],
-    judgment: '其他条件稳定，异常集中在固定学生，现有证据指向主讲老师的作业跟进没有触达。',
-    uncertainty: '尚未观察改为逐一联系后的提交变化。' }
+    evidence: ['未交集中在固定 6 名学生', '老师没有逐一联系', '同期作业难度和出勤未变化'],
+    solution: '教学人员请主讲老师本周逐一联系这 6 名学生，确认困难并约定提交时间。',
+    verification: '下两讲核对这 6 名学生的提交情况，并确认家长是否收到跟进。' },
+  { status: 'question', question: '请举一条反馈，老师写出了孩子的哪些具体表现？', problem: '', evidence: [], solution: '', verification: '' }
 ];
 env.ARK_API_KEY = 'local-synthetic-key';
 env.ARK_FETCH = async () => {
   const value = aiTurns.shift() || {
-    status: 'question', question: '请补充最能说明异常变化的事实。', problem: '', evidence: [], judgment: '', uncertainty: ''
+    status: 'question', question: '当时老师具体采取了什么动作？', problem: '', evidence: [], solution: '', verification: ''
   };
   return Response.json({ output: [{
     type: 'function_call', name: 'continue_teaching_diagnosis', arguments: JSON.stringify(value)
   }] });
 };
 const seeded = await call(createDiagnosis, {
-  name: '王老师作业异常', anomaly_type: 'homework', anomaly_fact: '连续三周未提交人数由 2 人增加到 8 人'
+  name: '王老师作业跟进', phenomenon: '连续三周未提交人数由 2 人增加到 8 人，教学人员已发现这个问题。'
 });
 const seededId = seeded.data.diagnosis.id;
 await call(updateDiagnosis, { answer: '集中在八年级一班固定 6 名学生；同期出勤和作业难度没有变化。' }, { method: 'PATCH', id: seededId });
@@ -43,6 +44,7 @@ createServer(async (incoming, outgoing) => {
   const url = new URL(incoming.url, 'http://127.0.0.1:8788');
   let response;
   if (url.pathname === '/mobile') response = new Response('<iframe title="390px 页面" src="/" style="width:390px;height:844px;border:1px solid #ccc"></iframe>');
+  else if (url.pathname === '/favicon.ico') response = new Response(null, { status: 204 });
   else if (url.pathname === '/' || url.pathname === '/screenshot') {
     const screenshotSetup = url.pathname === '/screenshot' ? `
       window.addEventListener('load', async () => {
@@ -52,6 +54,12 @@ createServer(async (incoming, outgoing) => {
         document.getElementById('diagnosisWorkspace')?.scrollIntoView({block:'start'});
       });` : '';
     const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8').replace('<script>', `<script>
+      window.addEventListener('DOMContentLoaded', () => {
+        const notice = document.createElement('div');
+        notice.textContent = '本地验收：合成数据与模拟 AI，非真实 AI 诊断';
+        notice.style.cssText = 'background:#fff3cd;color:#542c00;padding:8px 12px;margin-bottom:12px;font:14px sans-serif;border:2px solid #9a6700';
+        document.querySelector('main').prepend(notice);
+      });
       window.addEventListener('error', () => fetch('/test-error', {method:'POST'}));
       window.addEventListener('unhandledrejection', () => fetch('/test-error', {method:'POST'}));
       setInterval(() => { let check = document.getElementById('testDiagnostics');

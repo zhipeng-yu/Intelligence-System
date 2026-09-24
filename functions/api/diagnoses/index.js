@@ -16,12 +16,12 @@ export const onRequestPost = withUser(async ({ request, env, user }) => {
   let body;
   try { body = await request.json(); } catch { return json({ error: '请求格式无效。' }, 400); }
   const input = parseDiagnosisInput(body);
-  if (!input) return json({ error: '请填写有效的名称、异常类型、异常指标和证据。' }, 400);
+  if (!input) return json({ error: '请填写有效的案例名称和已发现的现象。' }, 400);
 
   let turn;
   try {
     turn = await runDiagnosisAI(env, {
-      name: input.name, anomaly_type: input.anomalyType, anomaly_fact: input.anomalyFact
+      name: input.name, phenomenon: input.phenomenon
     }, [], 0);
   } catch (error) {
     console.error('Teaching diagnosis AI failed', error);
@@ -34,14 +34,14 @@ export const onRequestPost = withUser(async ({ request, env, user }) => {
   const messages = completed ? [] : [{ role: 'assistant', content: turn.question }];
   await env.DB.prepare(`
     INSERT INTO teaching_diagnoses (
-      id, user_id, name, anomaly_type, anomaly_fact, status, messages_json,
-      problem, evidence_json, judgment, uncertainty, created_at, updated_at, completed_at
-    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?12, ?13)
+      id, user_id, name, phenomenon, status, messages_json,
+      problem, evidence_json, solution, verification, created_at, updated_at, completed_at
+    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11, ?12)
   `).bind(
-    id, user.id, input.name, input.anomalyType, input.anomalyFact,
+    id, user.id, input.name, input.phenomenon,
     completed ? 'completed' : 'active', JSON.stringify(messages),
     completed ? turn.problem : '', JSON.stringify(completed ? turn.evidence : []),
-    completed ? turn.judgment : '', completed ? turn.uncertainty : '', now, completed ? now : null
+    completed ? turn.solution : '', completed ? turn.verification : '', now, completed ? now : null
   ).run();
   const row = await env.DB.prepare(`
     SELECT ${DIAGNOSIS_COLUMNS} FROM teaching_diagnoses WHERE user_id = ?1 AND id = ?2

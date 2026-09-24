@@ -36,13 +36,13 @@ export const onRequestPatch = withUser(async ({ request, env, user, params }) =>
   const result = await env.DB.prepare(`
     UPDATE teaching_diagnoses
     SET messages_json = ?1, turn_count = turn_count + 1, revision = revision + 1,
-      status = ?2, problem = ?3, evidence_json = ?4, judgment = ?5, uncertainty = ?6,
+      status = ?2, problem = ?3, evidence_json = ?4, solution = ?5, verification = ?6,
       updated_at = ?7, completed_at = ?8
     WHERE user_id = ?9 AND id = ?10 AND status = 'active' AND revision = ?11
   `).bind(
     JSON.stringify(messages), completed ? 'completed' : 'active', completed ? turn.problem : '',
-    JSON.stringify(completed ? turn.evidence : []), completed ? turn.judgment : '',
-    completed ? turn.uncertainty : '', now, completed ? now : null, user.id, params.id, row.revision
+    JSON.stringify(completed ? turn.evidence : []), completed ? turn.solution : '',
+    completed ? turn.verification : '', now, completed ? now : null, user.id, params.id, row.revision
   ).run();
   if (!result.meta.changes) return json({ error: '诊断内容已变化，请刷新后重试。' }, 409);
   const saved = await env.DB.prepare(`
