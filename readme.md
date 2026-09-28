@@ -55,4 +55,6 @@ npx.cmd wrangler pages functions build
 
 当前 Node 39 项、Python 18 项通过，Pages Functions 构建及全新本地 `0001`～`0009` 迁移通过。内置浏览器核对桌面对话与结论；本地浏览器用合成数据和模拟 AI 验证 1280px、390px、三个主导航、键盘焦点及控制台，均无横向溢出或控制台错误。预览页明显标注模拟 AI，不能代表真实 Ark AI 验收。本地验收页可用 `node tests/preview-server.mjs` 启动，仅监听本机。截图：`artifacts/school-archive-desktop.png`。
 
-既有扫码绑定事项的生产授权与剩余验收见 `AGENTS.md`、`handoff.md` 和 `school-profile-handoff.md`。教学诊断本轮未获授权、也未执行生产迁移或部署。代码仓库：https://github.com/zhipeng-yu/Intelligence-System
+2026-09-28 核对：正式 Pages 环境已配置加密的 `ARK_API_KEY`，教学诊断 Pages Functions 在无测试注入时直接调用 Ark。当前本地 `.dev.vars` 没有该绑定，尚未完成真实 Ark 对话验收；诊断 `0009` 和页面仍未部署生产。
+
+既有扫码绑定事项的生产授权与剩余验收见 `AGENTS.md`、`handoff.md` 和 `school-profile-handoff.md`。教学诊断的生产迁移和部署尚未获授权、也未执行。代码仓库：https://github.com/zhipeng-yu/Intelligence-System
