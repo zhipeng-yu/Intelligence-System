@@ -6,11 +6,11 @@
 
 ## 发布状态
 
-2026-09-09 经用户明确授权，生产已更新为部署 `cfa1f6f1`、源码 `aa4f3a6`、迁移 `0008`，工作器目录已切换同一源码。新版空闲轮询返回0；**计划任务暂停，等待两个内部用户真实扫码及核验/检索验收**。本地模拟验证已通过，不能等同于真实验收完成。
+2026-09-28 经用户明确授权，生产已更新为部署 `fefc5b85`、源码 `8780a5a`、迁移 `0009`。教学诊断已上线并复用原有加密 Ark Secret；**网络资料计划任务仍暂停，等待两个内部用户真实扫码及核验/检索验收**。本地模拟验证不能等同于真实验收。
 
 用户已确认旧“24 位标准账号 ID”页面在刷新后变为“小红书号”。没有重复修改正确表单，也没有增加刷新脚本；不能据此认定特定缓存或预览域名是根因。
 
-当前本地 `main` 已新增第三个登录后一级板块“教学诊断”和迁移 `0009`，尚未执行生产 D1 迁移或 Pages 部署；生产仍是上述 `0008` 版本。
+当前 `main` 的应用代码与本次生产部署一致；原有 `.codex-tmp/` 未跟踪目录保留。
 
 ## 登录与学校资料
 
@@ -28,7 +28,7 @@
 - 三类工作共用全局串行工作器。绑定使用 3 分钟租约、最多 2 分钟等待；核验/检索继续使用 50 分钟租约、40 分钟详情截止及全站每日 180 次详情预算。已排队的资料任务等待绑定完成，运行中的资料任务阻止更换会话。
 - 验证码、安全验证或登录失效必须 blocked、通知并全局停机。人工恢复命令需要明确的用户 profile 标识：`python -m automation.network_worker repair-login --profile-id <内部随机标识>`。不得自动恢复。
 
-## 教学诊断（本地源码）
+## 教学诊断
 
 教学人员已自行观察数据，带着意识到的问题或现象进入网站，只需填写案例名称和简短描述。既有 Ark AI 一次只问一个问题，依回答追问具体场景、老师行为、反例或可验证事实；问题清楚时结束并输出“发现的问题、判断依据、解决办法、如何确认有效”。证据不足时说明不能定位，并给出下一步核实动作。对话保存到当前 Cookie 会话用户自己的 D1 数据中，最近 20 次可继续或查看。
 
@@ -53,8 +53,8 @@ npx.cmd wrangler d1 migrations apply ledu-school-archive --local --persist-to .w
 npx.cmd wrangler pages functions build
 ```
 
-当前 Node 39 项、Python 18 项通过，Pages Functions 构建及全新本地 `0001`～`0009` 迁移通过。内置浏览器核对桌面对话与结论；本地浏览器用合成数据和模拟 AI 验证 1280px、390px、三个主导航、键盘焦点及控制台，均无横向溢出或控制台错误。预览页明显标注模拟 AI，不能代表真实 Ark AI 验收。本地验收页可用 `node tests/preview-server.mjs` 启动，仅监听本机。截图：`artifacts/school-archive-desktop.png`。
+Node 39 项、Python 18 项通过，Pages Functions 构建及全新本地 `0001`～`0009` 迁移通过。发布前本地浏览器以合成数据和模拟 AI 验证 1280px、390px、三个主导航、键盘焦点及控制台，均无横向溢出或控制台错误；截图：`artifacts/school-archive-desktop.png`。模拟 AI 不代表真实 Ark 对话验收。本地验收页可用 `node tests/preview-server.mjs` 启动，仅监听本机。
 
-2026-09-28 核对：正式 Pages 环境已配置加密的 `ARK_API_KEY`，教学诊断 Pages Functions 在无测试注入时直接调用 Ark。当前本地 `.dev.vars` 没有该绑定，尚未完成真实 Ark 对话验收；诊断 `0009` 和页面仍未部署生产。
+2026-09-28 生产 `0009` 已应用，原有数据行数保持一致且外键检查通过；Pages 生产部署 `fefc5b85` 对应源码 `8780a5a`。正式域名返回 200 并包含教学诊断，未登录的诊断接口返回 401。现有加密 `ARK_API_KEY` 绑定保留，未读取或修改 Secret。内置浏览器连接超时，未完成有效登录会话下的真实 Ark 对话验收。
 
-既有扫码绑定事项的生产授权与剩余验收见 `AGENTS.md`、`handoff.md` 和 `school-profile-handoff.md`。教学诊断的生产迁移和部署尚未获授权、也未执行。代码仓库：https://github.com/zhipeng-yu/Intelligence-System
+既有扫码绑定事项的生产授权与剩余验收见 `AGENTS.md`、`handoff.md` 和 `school-profile-handoff.md`。代码仓库：https://github.com/zhipeng-yu/Intelligence-System
