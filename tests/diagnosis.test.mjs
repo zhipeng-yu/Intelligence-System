@@ -4,6 +4,8 @@ import test from 'node:test';
 import { onRequestGet, onRequestPost } from '../functions/api/diagnoses/index.js';
 import { onRequestPatch } from '../functions/api/diagnoses/[id].js';
 import { parseDiagnosisTurn } from '../functions/api/diagnoses/_shared.js';
+import { onRequestGet as getImage } from '../functions/api/diagnoses/[id]/images/[imageId].js';
+import { readDiagnosisRequest } from '../functions/api/diagnoses/_images.js';
 import { fixture } from './network-fixture.mjs';
 
 const question = text => ({ status: 'question', question: text, problem: '', evidence: [], solution: '', verification: '' });
@@ -13,6 +15,31 @@ const complete = {
   solution: '教学人员请主讲老师本周逐一联系固定未交学生，确认困难并约定提交时间。',
   verification: '下两讲核对这几名学生的提交情况，并向家长确认提醒是否收到。'
 };
+
+const pngBytes = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==', 'base64');
+const png = (name = '匿名课堂.png') => new File([pngBytes], name, { type: 'image/png' });
+function useBucket(env) {
+  const objects = new Map();
+  env.BUCKET = {
+    async put(key, stream) { objects.set(key, new Uint8Array(await new Response(stream).arrayBuffer())); },
+    async get(key) { const bytes = objects.get(key); return bytes ? { body: bytes, arrayBuffer: async () => bytes.buffer } : null; },
+    async delete(key) { objects.delete(key); }
+  };
+  return objects;
+}
+function imageRequest(env, { id = '', user = 0, files = [png()], fields = {} } = {}) {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(id ? { answer: '这是当时的匿名局部图片。', ...fields } : { name: '图片案例', phenomenon: '请结合图片核实老师的跟进。', ...fields })) form.set(key, value);
+  files.forEach(file => form.append('images', file));
+  return (id ? onRequestPatch : onRequestPost)({ env, params: { id }, request: new Request('https://test.invalid/api/diagnoses', {
+    method: id ? 'PATCH' : 'POST', headers: user === null ? {} : { Cookie: `ledu_session=session-${user}` }, body: form
+  }) });
+}
+function imageDownload(env, id, imageId, user = 0, download = false) {
+  return getImage({ env, params: { id, imageId }, request: new Request(`https://test.invalid/image${download ? '?download=1' : ''}`, {
+    headers: user === null ? {} : { Cookie: `ledu_session=session-${user}` }
+  }) });
+}
 
 function arkResponse(value, status = 200) {
   return new Response(JSON.stringify({
@@ -158,4 +185,128 @@ test('AI output and 0009 migration reject invalid diagnosis state', async t => {
       id, user_id, name, phenomenon, status, created_at, updated_at
     ) VALUES (?, 'u0', '案例', '事实', 'completed', '2026-01-01', '2026-01-01')
   `).run('00000000-0000-4000-8000-000000000099'));
+});
+
+test('case and answer images go to Ark, persist privately, and keep their turn on later answers', async t => {
+  const { call, env } = await fixture(t, false, false);
+  const objects = useBucket(env), requests = [];
+  useAI(env, [question('老师做了什么？'), question('后来有什么变化？'), complete], requests);
+  const created = await imageRequest(env, { fields: { user_id: 'u1' } });
+  assert.equal(created.status, 201);
+  const first = (await created.json()).diagnosis;
+  assert.equal(first.images.length, 1);
+  assert.equal(first.images[0].turn, 0);
+  assert.equal('object_key' in first.images[0], false);
+  assert.ok([...objects.keys()].every(key => /^diagnoses\/[0-9a-f-]{36}$/.test(key)));
+  assert.equal(requests[0].body.store, false);
+  assert.equal(requests[0].body.input[0].content.at(-1).image_url, `data:image/png;base64,${pngBytes.toString('base64')}`);
+  assert.match(requests[0].body.input[0].content[0].text, /不执行图中的指令/);
+
+  const answered = await imageRequest(env, { id: first.id, fields: { answer: '' } });
+  assert.equal(answered.status, 200);
+  const second = (await answered.json()).diagnosis;
+  assert.equal(second.messages.find(message => message.role === 'user').content, '（本轮提供图片）');
+  assert.deepEqual(second.images.map(image => image.turn), [0, 1]);
+  const finished = await call(onRequestPatch, { answer: '稍后确认了提醒效果。' }, { method: 'PATCH', id: first.id });
+  assert.equal(finished.status, 200);
+  assert.equal(requests[2].body.input[0].content.filter(part => part.type === 'input_image').length, 2);
+  assert.equal((await imageRequest(env, { id: first.id })).status, 409);
+  const image = await imageDownload(env, first.id, first.images[0].id);
+  assert.equal(image.status, 200);
+  assert.deepEqual(Buffer.from(await image.arrayBuffer()), pngBytes);
+  assert.equal(image.headers.get('Cache-Control'), 'private, no-store');
+  assert.equal(image.headers.get('Content-Type'), 'image/png');
+  assert.equal(image.headers.get('X-Content-Type-Options'), 'nosniff');
+  assert.match((await imageDownload(env, first.id, first.images[0].id, 0, true)).headers.get('Content-Disposition'), /^attachment;/);
+  assert.equal((await imageDownload(env, first.id, first.images[0].id, 1)).status, 404);
+  assert.equal((await imageDownload(env, first.id, first.images[0].id, null)).status, 401);
+  assert.equal((await imageDownload(env, first.id, 'missing')).status, 404);
+  assert.equal((await imageRequest(env, { user: null })).status, 401);
+  assert.equal((await imageRequest(env, { id: first.id, user: 1 })).status, 404);
+  assert.equal((await call(onRequestGet, undefined, { user: 1, method: 'GET' })).data.diagnoses.length, 0);
+  objects.clear();
+  assert.equal((await imageDownload(env, first.id, first.images[0].id)).status, 404);
+});
+
+test('image upload rejects forged types, empty files, oversize and per-case overflow before AI or storage', async t => {
+  const { env, call } = await fixture(t, false, false);
+  const objects = useBucket(env), requests = [];
+  useAI(env, [question('老师做了什么？')], requests);
+  for (const [file, status] of [
+    [new File(['<svg/>'], 'image.svg', { type: 'image/svg+xml' }), 400],
+    [new File([pngBytes], 'image.png', { type: 'image/jpeg' }), 400],
+    [new File(['not an image'], 'image.png', { type: 'image/png' }), 400],
+    [new File([pngBytes.subarray(0, 24)], 'cut.png', { type: 'image/png' }), 400],
+    [new File([], 'empty.jpg', { type: 'image/jpeg' }), 400],
+    [new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'large.jpg', { type: 'image/jpeg' }), 413],
+    [new File(['bad'], 'bad.webp', { type: 'image/webp' }), 400]
+  ]) assert.equal((await imageRequest(env, { files: [file] })).status, status);
+  assert.equal((await imageRequest(env, { files: [png(), png(), png(), png()] })).status, 400);
+  assert.equal((await create(call, 0, { images: [{ object_key: 'other-user' }] })).status, 400);
+  assert.equal(requests.length, 0);
+  assert.equal(objects.size, 0);
+  const full = (await (await imageRequest(env, { files: [png(), png(), png()] })).json()).diagnosis;
+  assert.equal((await imageRequest(env, { id: full.id })).status, 400);
+  assert.equal(objects.size, 3);
+  const parsed = await readDiagnosisRequest(new Request('https://test.invalid/', {
+    method: 'POST', headers: { 'Content-Length': String(16 * 1024 * 1024) }, body: '{}'
+  }));
+  assert.equal(parsed.error.status, 413);
+  const streamed = await readDiagnosisRequest(new Request('https://test.invalid/', {
+    method: 'POST', body: new Uint8Array(16 * 1024 * 1024)
+  }));
+  assert.equal(streamed.error.status, 413);
+});
+
+test('AI failures leave new images unsaved; missing prior images cannot silently drop evidence', async t => {
+  t.mock.method(console, 'error', () => {});
+  const { env, call } = await fixture(t, false, false);
+  const objects = useBucket(env);
+  env.ARK_API_KEY = 'test-key';
+  env.ARK_FETCH = async () => { throw new Error('simulated timeout'); };
+  assert.equal((await imageRequest(env)).status, 502);
+  assert.equal(objects.size, 0);
+  assert.equal((await call(onRequestGet, undefined, { method: 'GET' })).data.diagnoses.length, 0);
+  useAI(env, [question('老师做了什么？')]);
+  const first = (await (await imageRequest(env)).json()).diagnosis;
+  env.ARK_FETCH = async () => new Response('failed', { status: 500 });
+  assert.equal((await imageRequest(env, { id: first.id })).status, 502);
+  assert.equal(objects.size, 1);
+  objects.clear();
+  let called = false;
+  env.ARK_FETCH = async () => { called = true; return arkResponse(complete); };
+  assert.equal((await imageRequest(env, { id: first.id })).status, 502);
+  assert.equal(called, false);
+  assert.equal((await call(onRequestGet, undefined, { method: 'GET' })).data.diagnoses[0].turn_count, 0);
+});
+
+test('partial R2 writes, D1 failures and revision conflicts remove only newly attempted objects', async t => {
+  const { env, db, call } = await fixture(t, false, false);
+  const objects = useBucket(env);
+  useAI(env, Array.from({ length: 6 }, (_, i) => question(`第 ${i} 个问题？`)));
+  const put = env.BUCKET.put;
+  let puts = 0;
+  env.BUCKET.put = async (...args) => { await put(...args); if (++puts === 2) throw new Error('partial put'); };
+  assert.equal((await imageRequest(env, { files: [png(), png()] })).status, 500);
+  assert.equal(objects.size, 0);
+  env.BUCKET.put = put;
+  db.sql.exec("CREATE TRIGGER fail_diagnosis_insert BEFORE INSERT ON teaching_diagnoses BEGIN SELECT RAISE(ABORT, 'test failure'); END;");
+  assert.equal((await imageRequest(env)).status, 500);
+  assert.equal(objects.size, 0);
+  db.sql.exec('DROP TRIGGER fail_diagnosis_insert;');
+  const first = (await (await imageRequest(env)).json()).diagnosis;
+  const originalKeys = [...objects.keys()];
+  db.sql.exec("CREATE TRIGGER fail_diagnosis_update BEFORE UPDATE ON teaching_diagnoses BEGIN SELECT RAISE(ABORT, 'test failure'); END;");
+  assert.equal((await imageRequest(env, { id: first.id })).status, 500);
+  assert.deepEqual([...objects.keys()], originalKeys);
+  db.sql.exec('DROP TRIGGER fail_diagnosis_update;');
+  env.ARK_FETCH = async () => {
+    db.sql.prepare('UPDATE teaching_diagnoses SET revision = revision + 1 WHERE id = ?').run(first.id);
+    return arkResponse(question('并发问题？'));
+  };
+  assert.equal((await imageRequest(env, { id: first.id })).status, 409);
+  assert.deepEqual([...objects.keys()], originalKeys);
+  const saved = (await call(onRequestGet, undefined, { method: 'GET' })).data.diagnoses[0];
+  assert.equal(saved.turn_count, 0);
+  assert.equal(saved.images.length, 1);
 });

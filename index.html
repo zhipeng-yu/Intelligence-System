@@ -236,6 +236,12 @@
     .diagnosis-result h4 { margin: 14px 0 5px; color: var(--red-dark); font-size: 11px; letter-spacing: .08em; }
     .diagnosis-result p, .diagnosis-result ul { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
     .diagnosis-result ul { padding-left: 20px; }
+    .diagnosis-images { display: flex; flex-wrap: wrap; gap: 12px; margin: 10px 0; }
+    .diagnosis-image { margin: 0; width: 160px; max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
+    .diagnosis-image img { display: block; width: 100%; height: 120px; object-fit: contain; background: var(--paper); border: 1px solid var(--line); }
+    .diagnosis-image figcaption { margin: 5px 0; font-size: 12px; }
+    .diagnosis-image a, .diagnosis-image button { display: inline-flex; align-items: center; min-height: 44px; }
+    .diagnosis-image-input { width: 100%; min-height: 44px; }
     dialog { width: min(560px, calc(100% - 30px)); padding: 0; color: var(--ink); background: var(--paper); border: 1px solid var(--ink); box-shadow: var(--shadow); }
     dialog::backdrop { background: rgba(18, 42, 46, .58); }
     .dialog-panel { padding: 24px; }
@@ -473,10 +479,17 @@
               <div><span class="eyebrow">案例</span><h2 id="diagnosisCaseTitle"></h2></div>
               <span class="status" id="diagnosisCaseStatus"></span>
             </div>
-            <div class="diagnosis-original"><strong>已发现的现象</strong><span id="diagnosisOriginalFact"></span></div>
+            <div class="diagnosis-original"><strong>已发现的现象</strong><span id="diagnosisOriginalFact"></span><div class="diagnosis-images" id="diagnosisOriginalImages"></div></div>
             <div class="diagnosis-interview" id="diagnosisInterview" aria-live="polite"></div>
             <form class="compact-form diagnosis-answer" id="diagnosisAnswerForm">
               <div class="form-field"><label for="diagnosisAnswer">回答 AI 当前的问题</label><textarea id="diagnosisAnswer" maxlength="4000" required></textarea></div>
+              <div class="form-field">
+                <label for="answerImages">添加或粘贴图片（可选）</label>
+                <input class="diagnosis-image-input" id="answerImages" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple aria-describedby="answerImagesHint answerImagesError">
+                <p class="notice" id="answerImagesHint">可在回答框直接粘贴图片。JPG、PNG、WebP，每张不超过 5MB，每次诊断累计最多 3 张。图片仅你可查看，并交给 AI 辅助分析；请先遮挡个人信息。</p>
+                <p class="notice" id="answerImagesError" role="status" aria-live="polite"></p>
+                <div class="diagnosis-images" id="answerImagesPreview"></div>
+              </div>
               <p class="notice">请概括事实和证据，不粘贴完整聊天记录，不填写学生姓名、手机号或个人成绩。</p>
               <button class="primary-button" id="sendDiagnosisAnswer" type="submit">回答并继续</button>
             </form>
@@ -505,6 +518,13 @@
       <form class="compact-form" id="newDiagnosisForm">
         <div class="form-field"><label for="diagnosisName">老师或案例名称</label><input id="diagnosisName" maxlength="120" required></div>
         <div class="form-field"><label for="diagnosisPhenomenon">你已发现什么问题或现象？</label><textarea id="diagnosisPhenomenon" maxlength="4000" required></textarea></div>
+        <div class="form-field">
+          <label for="caseImages">添加或粘贴图片（可选）</label>
+          <input class="diagnosis-image-input" id="caseImages" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple aria-describedby="caseImagesHint caseImagesError">
+          <p class="notice" id="caseImagesHint">可在现象描述框直接粘贴图片。JPG、PNG、WebP，每张不超过 5MB，每次诊断累计最多 3 张。图片仅你可查看，并交给 AI 辅助分析；请先遮挡个人信息。</p>
+          <p class="notice" id="caseImagesError" role="status" aria-live="polite"></p>
+          <div class="diagnosis-images" id="caseImagesPreview"></div>
+        </div>
         <p class="notice">用自己的话简述即可，无需重新录入大量数据；请勿填写学生姓名、手机号或个人成绩。</p>
         <button class="primary-button" type="submit">让 AI 开始提问</button>
         <p class="notice" id="newDiagnosisMessage" role="status" aria-live="polite"></p>
@@ -858,6 +878,109 @@
       return diagnoses.find(item => item.id === selectedDiagnosisId) || null;
     }
 
+    const diagnosisDraftImages = { caseImages: [], answerImages: [] };
+    let diagnosisBusy = false;
+
+    function clearDiagnosisImages(id) {
+      diagnosisDraftImages[id].forEach(item => URL.revokeObjectURL(item.url));
+      diagnosisDraftImages[id] = [];
+      document.getElementById(id).value = '';
+      document.getElementById(`${id}Preview`).replaceChildren();
+      showMessage(document.getElementById(`${id}Error`));
+      if (id === 'answerImages') document.querySelector('#diagnosisAnswer').required = true;
+    }
+
+    function renderDraftImages(id) {
+      document.getElementById(`${id}Preview`).replaceChildren(...diagnosisDraftImages[id].map((item, index) => {
+        const figure = node('figure', '', 'diagnosis-image');
+        const img = node('img');
+        img.src = item.url;
+        img.alt = `待提交图片：${item.file.name}`;
+        figure.append(img, node('figcaption', `${item.file.name} · ${formatSize(item.file.size)}`), actionButton('移除', () => {
+          URL.revokeObjectURL(item.url);
+          diagnosisDraftImages[id].splice(index, 1);
+          showMessage(document.getElementById(`${id}Error`));
+          renderDraftImages(id);
+          document.getElementById(id).focus();
+        }));
+        return figure;
+      }));
+      if (id === 'answerImages') document.querySelector('#diagnosisAnswer').required = !diagnosisDraftImages[id].length;
+    }
+
+    function addDiagnosisImages(id, files) {
+      if (diagnosisBusy) return;
+      if (id === 'answerImages' && selectedDiagnosis()?.status !== 'active') return;
+      const savedCount = id === 'answerImages' ? (selectedDiagnosis()?.images || []).length : 0;
+      let error = '';
+      if (savedCount + diagnosisDraftImages[id].length + files.length > 3) error = '每次诊断累计最多 3 张图片，请先移除待提交图片。';
+      else if (files.some(file => !file.size || file.size > 5 * 1024 * 1024)) error = '请选择非空图片，每张不能超过 5MB。';
+      else if (files.some(file => !/\.(jpe?g|png|webp)$/i.test(file.name) || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type))) error = '请选择 JPG、PNG 或 WebP 图片。';
+      showMessage(document.getElementById(`${id}Error`), error, error ? 'error' : '');
+      if (error) return;
+      diagnosisDraftImages[id].push(...files.map(file => ({ file, url: URL.createObjectURL(file) })));
+      renderDraftImages(id);
+    }
+
+    Object.keys(diagnosisDraftImages).forEach(id => {
+      document.getElementById(id).addEventListener('change', event => {
+        const files = [...event.target.files];
+        event.target.value = '';
+        addDiagnosisImages(id, files);
+      });
+      const form = document.getElementById(id === 'caseImages' ? 'newDiagnosisForm' : 'diagnosisAnswerForm');
+      form.addEventListener('paste', event => {
+        const files = [...(event.clipboardData?.items || [])]
+          .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
+          .map(item => item.getAsFile()).filter(Boolean);
+        if (!files.length) return;
+        event.preventDefault();
+        addDiagnosisImages(id, files);
+      });
+    });
+
+    function diagnosisRequest(method, fields, id) {
+      const body = new FormData();
+      Object.entries(fields).forEach(([key, value]) => body.set(key, value));
+      diagnosisDraftImages[id].forEach(item => body.append('images', item.file));
+      return { method, body };
+    }
+
+    function lockDiagnosis() {
+      diagnosisBusy = true;
+      const controls = [...document.querySelectorAll('#diagnosisView button, #diagnosisView input, #diagnosisView textarea, #diagnosisDialog button, #diagnosisDialog input, #diagnosisDialog textarea, .side-nav button, #logoutButton')];
+      const disabled = controls.map(control => control.disabled);
+      controls.forEach(control => { control.disabled = true; });
+      return () => {
+        if (!diagnosisBusy) return;
+        diagnosisBusy = false;
+        controls.forEach((control, index) => { control.disabled = disabled[index]; });
+      };
+    }
+
+    function savedDiagnosisImages(item, turn) {
+      return (item.images || []).filter(image => image.turn === turn).map(image => {
+        const figure = node('figure', '', 'diagnosis-image');
+        const path = `/api/diagnoses/${encodeURIComponent(item.id)}/images/${encodeURIComponent(image.id)}`;
+        const link = node('a');
+        link.href = path;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.setAttribute('aria-label', `查看图片：${image.name}（新窗口）`);
+        const img = node('img');
+        img.alt = image.name;
+        img.src = path;
+        img.loading = 'lazy';
+        img.addEventListener('error', () => { img.alt = '图片加载失败，请重新打开诊断重试'; });
+        link.append(img);
+        const download = node('a', '下载图片');
+        download.href = `${path}?download=1`;
+        download.download = image.name;
+        figure.append(link, node('figcaption', image.name), download);
+        return figure;
+      });
+    }
+
     function diagnosisCaseButton(item) {
       const button = node('button', '', `diagnosis-case${item.id === selectedDiagnosisId ? ' active' : ''}`);
       button.type = 'button';
@@ -866,6 +989,11 @@
       const detail = `${DIAGNOSIS_STATUS_LABELS[item.status]} · ${formatDate(item.updated_at)}`;
       button.append(node('span', detail));
       button.addEventListener('click', () => {
+        if (diagnosisBusy) return;
+        if (selectedDiagnosisId !== item.id) {
+          clearDiagnosisImages('answerImages');
+          diagnosisAnswerForm.reset();
+        }
         selectedDiagnosisId = item.id;
         renderDiagnoses();
         diagnosisWorkspace.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -876,15 +1004,28 @@
     function renderDiagnosisWorkspace() {
       const item = selectedDiagnosis();
       diagnosisWorkspace.hidden = !item;
-      if (!item) return;
+      if (!item) {
+        document.querySelector('#diagnosisOriginalImages').replaceChildren();
+        document.querySelector('#diagnosisInterview').replaceChildren();
+        return;
+      }
       document.querySelector('#diagnosisCaseTitle').textContent = item.name;
       document.querySelector('#diagnosisCaseStatus').textContent = DIAGNOSIS_STATUS_LABELS[item.status];
       document.querySelector('#diagnosisCaseStatus').className = `status ${item.status === 'completed' ? 'completed' : 'processing'}`;
       document.querySelector('#diagnosisOriginalFact').textContent = item.phenomenon;
+      document.querySelector('#diagnosisOriginalImages').replaceChildren(...savedDiagnosisImages(item, 0));
+      document.querySelector('#answerImages').disabled = (item.images || []).length >= 3;
+      document.querySelector('#answerImagesHint').textContent = `可在回答框直接粘贴图片，还可添加 ${3 - (item.images || []).length} 张。JPG、PNG、WebP，每张不超过 5MB。图片仅你可查看，并交给 AI 辅助分析；请先遮挡个人信息。`;
       showMessage(diagnosisMessage);
+      let answerTurn = 0;
       document.querySelector('#diagnosisInterview').replaceChildren(...item.messages.map(message => {
         const bubble = node('div', '', `diagnosis-message${message.role === 'user' ? ' teaching' : ''}`);
         bubble.append(node('strong', message.role === 'user' ? '教学' : 'AI'), node('span', message.content));
+        if (message.role === 'user') {
+          const images = node('div', '', 'diagnosis-images');
+          images.append(...savedDiagnosisImages(item, ++answerTurn));
+          bubble.append(images);
+        }
         return bubble;
       }));
       diagnosisAnswerForm.hidden = item.status === 'completed';
@@ -1217,6 +1358,7 @@
     });
 
     document.querySelector('#logoutButton').addEventListener('click', async () => {
+      if (diagnosisBusy) return;
       bindingRevision++; clearTimeout(bindingTimer); clearBindingImage(); bindingKey = null; bindingRequest = null;
       try { await apiFetch('/api/auth/logout', { method: 'POST' }); } catch { /* cookie is cleared by expiry too */ }
       documents = [];
@@ -1225,6 +1367,12 @@
       searches = [];
       diagnoses = [];
       selectedDiagnosisId = '';
+      clearDiagnosisImages('caseImages');
+      clearDiagnosisImages('answerImages');
+      document.querySelector('#newDiagnosisForm').reset();
+      diagnosisAnswerForm.reset();
+      diagnosisDialog.close();
+      renderDiagnoses();
       networkBudget = { limit: 180, actual: 0, reserved: 0, remaining: 180 };
       isAdmin = false;
       await showLogin();
@@ -1270,44 +1418,58 @@
     });
 
     document.querySelector('#newDiagnosisButton').addEventListener('click', () => {
+      if (diagnosisBusy) return;
       showMessage(document.querySelector('#newDiagnosisMessage'));
       diagnosisDialog.showModal();
       document.querySelector('#diagnosisName').focus();
     });
     document.querySelector('#closeDiagnosisDialog').addEventListener('click', () => diagnosisDialog.close());
+    diagnosisDialog.addEventListener('cancel', event => { if (diagnosisBusy) event.preventDefault(); });
+    diagnosisDialog.addEventListener('close', () => {
+      clearDiagnosisImages('caseImages');
+      document.querySelector('#newDiagnosisForm').reset();
+    });
     document.querySelector('#newDiagnosisForm').addEventListener('submit', async event => {
       event.preventDefault();
+      if (diagnosisBusy) return;
       const form = event.currentTarget;
-      const button = form.querySelector('button[type="submit"]');
-      button.disabled = true;
+      const options = diagnosisRequest('POST', {
+        name: document.querySelector('#diagnosisName').value,
+        phenomenon: document.querySelector('#diagnosisPhenomenon').value
+      }, 'caseImages');
+      const unlock = lockDiagnosis();
+      showMessage(document.querySelector('#newDiagnosisMessage'), '正在提交，AI 正在分析文字和图片…');
       try {
-        const data = await (await apiFetch('/api/diagnoses', jsonRequest('POST', {
-          name: document.querySelector('#diagnosisName').value,
-          phenomenon: document.querySelector('#diagnosisPhenomenon').value
-        }))).json();
+        const data = await (await apiFetch('/api/diagnoses', options)).json();
+        unlock();
         diagnoses.unshift(data.diagnosis);
         selectedDiagnosisId = data.diagnosis.id;
         form.reset();
+        clearDiagnosisImages('answerImages');
+        diagnosisAnswerForm.reset();
         diagnosisDialog.close();
         renderDiagnoses();
         diagnosisWorkspace.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        document.querySelector('#diagnosisAnswer').focus();
+        (data.diagnosis.status === 'completed' ? diagnosisResult : document.querySelector('#diagnosisAnswer')).focus();
       } catch (error) { showMessage(document.querySelector('#newDiagnosisMessage'), error.message, 'error'); }
-      finally { button.disabled = false; }
+      finally { unlock(); }
     });
 
     diagnosisAnswerForm.addEventListener('submit', async event => {
       event.preventDefault();
+      if (diagnosisBusy) return;
       const item = selectedDiagnosis();
       if (!item) return;
       const answer = document.querySelector('#diagnosisAnswer');
-      const button = document.querySelector('#sendDiagnosisAnswer');
-      button.disabled = true;
-      showMessage(diagnosisMessage, 'AI 正在分析并决定下一问…');
+      const options = diagnosisRequest('PATCH', { answer: answer.value }, 'answerImages');
+      const unlock = lockDiagnosis();
+      showMessage(diagnosisMessage, 'AI 正在分析文字和图片，并决定下一问…');
       try {
-        const data = await (await apiFetch(`/api/diagnoses/${encodeURIComponent(item.id)}`, jsonRequest('PATCH', { answer: answer.value }))).json();
+        const data = await (await apiFetch(`/api/diagnoses/${encodeURIComponent(item.id)}`, options)).json();
+        unlock();
         diagnoses = diagnoses.map(value => value.id === data.diagnosis.id ? data.diagnosis : value);
         answer.value = '';
+        clearDiagnosisImages('answerImages');
         renderDiagnoses();
         if (data.diagnosis.status === 'completed') {
           showMessage(diagnosisMessage, '诊断已完成。', 'success');
@@ -1316,7 +1478,7 @@
           answer.focus();
         }
       } catch (error) { showMessage(diagnosisMessage, error.message, 'error'); }
-      finally { button.disabled = false; }
+      finally { unlock(); }
     });
 
     document.querySelector('#adminUserForm').addEventListener('submit', async event => {

@@ -10,8 +10,15 @@ import { onRequestPost as claim } from '../functions/api/network/worker/claim.js
 import { onRequestPost as report } from '../functions/api/network/worker/binding.js';
 import { onRequestGet as diagnoses, onRequestPost as createDiagnosis } from '../functions/api/diagnoses/index.js';
 import { onRequestPatch as updateDiagnosis } from '../functions/api/diagnoses/[id].js';
+import { onRequestGet as diagnosisImage } from '../functions/api/diagnoses/[id]/images/[imageId].js';
 const { env, call } = await fixture({ after() {} }, false, false);
-env.BUCKET = {};
+const imageObjects = new Map();
+env.BUCKET = {
+  async put(key, stream) { imageObjects.set(key, new Uint8Array(await new Response(stream).arrayBuffer())); },
+  async get(key) { const bytes = imageObjects.get(key); return bytes ? { body: bytes, arrayBuffer: async () => bytes.buffer } : null; },
+  async delete(key) { imageObjects.delete(key); }
+};
+let failNextAI = false;
 const aiTurns = [
   { status: 'question', question: '这几名未交学生是否一直是同一批？', problem: '', evidence: [], solution: '', verification: '' },
   { status: 'question', question: '老师对这些固定未交学生具体做过什么？', problem: '', evidence: [], solution: '', verification: '' },
@@ -23,6 +30,7 @@ const aiTurns = [
 ];
 env.ARK_API_KEY = 'local-synthetic-key';
 env.ARK_FETCH = async () => {
+  if (failNextAI) { failNextAI = false; return new Response('Simulated failure', { status: 503 }); }
   const value = aiTurns.shift() || {
     status: 'question', question: '当时老师具体采取了什么动作？', problem: '', evidence: [], solution: '', verification: ''
   };
@@ -59,6 +67,27 @@ createServer(async (incoming, outgoing) => {
         notice.textContent = '本地验收：合成数据与模拟 AI，非真实 AI 诊断';
         notice.style.cssText = 'background:#fff3cd;color:#542c00;padding:8px 12px;margin-bottom:12px;font:14px sans-serif;border:2px solid #9a6700';
         document.querySelector('main').prepend(notice);
+        for (const id of ['caseImages', 'answerImages']) {
+          const button = document.createElement('button');
+          button.type = 'button'; button.textContent = '测试：选择合成图片';
+          button.addEventListener('click', async () => {
+            const canvas = document.createElement('canvas'); canvas.width = 480; canvas.height = 240;
+            const ctx = canvas.getContext('2d'); ctx.fillStyle = '#fffdf8'; ctx.fillRect(0,0,480,240);
+            ctx.fillStyle = '#122a2e'; ctx.font = '20px sans-serif'; ctx.fillText('SYNTHETIC CLASS NOTE', 24, 36);
+            ['Group reminder', 'Individual follow-up', 'Next lesson check'].forEach((text, index) => {
+              ctx.fillStyle = index ? '#5f6f6f' : '#a92d20'; ctx.fillText(text, 24, 84 + index * 54);
+              ctx.fillRect(280, 65 + index * 54, index ? 24 : 160, 24);
+            });
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+            const transfer = new DataTransfer(); transfer.items.add(new File([blob], '合成课堂记录.png', {type:'image/png'}));
+            const input = document.getElementById(id); input.files = transfer.files;
+            input.dispatchEvent(new Event('change', {bubbles:true}));
+          });
+          document.getElementById(id).after(button);
+        }
+        const failButton = document.createElement('button'); failButton.textContent = '测试：下次 AI 失败'; failButton.type = 'button';
+        failButton.addEventListener('click', () => fetch('/test-ai-failure', {method:'POST'}));
+        document.getElementById('diagnosisAnswerForm').append(failButton);
       });
       window.addEventListener('error', () => fetch('/test-error', {method:'POST'}));
       window.addEventListener('unhandledrejection', () => fetch('/test-error', {method:'POST'}));
@@ -70,16 +99,19 @@ createServer(async (incoming, outgoing) => {
     </script><script>`);
     response = new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
   } else if (url.pathname === '/test-error') { errors++; response = new Response('ok'); }
+  else if (url.pathname === '/test-ai-failure') { failNextAI = true; response = new Response('ok'); }
   else if (url.pathname === '/diagnostics') response = Response.json({ errors });
   else if (url.pathname === '/api/auth/me') response = Response.json({ authenticated: true, user: { id: 'u0', phone_last4: '1234', note: '测试用户' }, turnstile_site_key: '' });
   else if (url.pathname === '/api/documents') response = Response.json({ documents: [], is_admin: false });
-  else if (routes[url.pathname]?.[incoming.method] || (incoming.method === 'PATCH' && /^\/api\/diagnoses\/[^/]+$/.test(url.pathname))) {
+  else if (routes[url.pathname]?.[incoming.method] || (incoming.method === 'PATCH' && /^\/api\/diagnoses\/[^/]+$/.test(url.pathname)) || /^\/api\/diagnoses\/[^/]+\/images\/[^/]+$/.test(url.pathname)) {
     const chunks = []; for await (const chunk of incoming) chunks.push(chunk);
     const body = Buffer.concat(chunks);
-    const diagnosisId = url.pathname.startsWith('/api/diagnoses/') ? decodeURIComponent(url.pathname.split('/').pop()) : '';
-    const handler = diagnosisId ? updateDiagnosis : routes[url.pathname][incoming.method];
-    response = await handler({ env, params: { id: diagnosisId }, request: new Request(url, {
-      method: incoming.method, headers: { Cookie: 'ledu_session=session-0', 'Content-Type': 'application/json' },
+    const parts = url.pathname.split('/');
+    const diagnosisId = url.pathname.startsWith('/api/diagnoses/') ? decodeURIComponent(parts[3]) : '';
+    const imageId = parts[4] === 'images' ? decodeURIComponent(parts[5]) : '';
+    const handler = imageId ? diagnosisImage : diagnosisId ? updateDiagnosis : routes[url.pathname][incoming.method];
+    response = await handler({ env, params: { id: diagnosisId, imageId }, request: new Request(url, {
+      method: incoming.method, headers: { Cookie: 'ledu_session=session-0', 'Content-Type': incoming.headers['content-type'] || 'application/json' },
       body: body.length ? body : undefined
     }) });
     if (url.pathname === '/api/network/binding' && incoming.method === 'POST' && response.status === 202) {
