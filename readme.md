@@ -63,4 +63,4 @@ Node 43 项、Python 18 项通过，Pages Functions 构建及全新本地 `0001`
 
 登录正式站后，用两个合成课堂案例完成真实 Ark 验收：创建时粘贴图片、文字触发追问后仅图片回答，AI 准确读出只在图片中的两位数乘法进位、7/12 人出错和未复测事实；刷新后重新进入诊断，图片与结论仍完整。390px 无横向溢出，键盘焦点可见，控制台无错误。`artifacts/school-archive-desktop.png` 现为正式站验收截图。AI 自行给出的 1/5、1/6 有效性阈值未经教学校准，不能视作已验证标准；通过的是图片识别及保存流程。生产故障注入、第二用户隔离未实测，相关失败与隔离边界由本地测试覆盖。
 
-既有扫码绑定事项的生产授权与剩余验收见 `AGENTS.md`、`handoff.md` 和 `school-profile-handoff.md`。代码仓库：https://github.com/zhipeng-yu/Intelligence-System
+既有扫码绑定事项的生产授权与剩余验收见 `AGENTS.md` 和 `handoff.md`。代码仓库：https://github.com/zhipeng-yu/Intelligence-System

@@ -2,7 +2,7 @@
 
 ## 开始前
 
-完整阅读 `readme.md`、`handoff.md`、`school-profile-handoff.md` 和相关代码；确认位于 `main`，fetch 后只读核对 `origin/main` 未出现未知变化。只允许正常快进推送，禁止 pull 和强推。
+完整阅读 `readme.md`、`handoff.md` 和相关代码；确认位于 `main`，fetch 后只读核对 `origin/main` 未出现未知变化。只允许正常快进推送，禁止 pull 和强推。
 
 涉及网络资料时使用 ponytail full，并完整阅读固定提交 `afa96802d3e61cdd5e7bd7b37ec59182bbe07d37` 对应的已安装 `xiaohongshu-skill` 指令与相关浏览器、登录、主页和详情代码。
 
@@ -10,7 +10,7 @@
 
 生产已更新为部署 `101aa2cf`、应用源码 `c8016ce`、D1 `0010`，教学诊断图片已上线并完成真实 Ark 识图验收。工作器目录为当前 `main`，网络资料计划任务仍暂停，等待两用户真实扫码验收。既有 Secret 未修改；旧七日计划任务保持禁用，状态、seen.json、held_candidates 与旧 profile 原样保留。
 
-扫码绑定与 `0008` 已部署，但真实扫码验收待完成。用户确认旧 24 位页面刷新后已显示小红书号，无需修改正确表单。详见 readme.md、handoff.md、school-profile-handoff.md。
+扫码绑定与 `0008` 已部署，但真实扫码验收待完成。用户确认旧 24 位页面刷新后已显示小红书号，无需修改正确表单。详见 readme.md、handoff.md。
 
 ## 维护边界
 
@@ -47,4 +47,4 @@
 
 ## 每次任务收尾
 
-按实际结果精简更新 `readme.md`、`handoff.md`、`school-profile-handoff.md` 和本文件，删除失效说明。除非用户明确要求不提交或不推送，验证通过后正常提交并快进推送。
+按实际结果精简更新 `readme.md`、`handoff.md` 和本文件，删除失效说明。除非用户明确要求不提交或不推送，验证通过后正常提交并快进推送。
