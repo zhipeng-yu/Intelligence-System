@@ -6,6 +6,8 @@
 
 ## 发布状态
 
+2026-10-10 已完成本地 UI 改版：统一浅色工作台、系统字体、乐读红重点色与控件间距，重排诊断聊天、图片附件、输入区及四段结论。保留单个原生页面，无新增应用依赖。原生 CSS 与少量 Web Animations 提供板块、弹窗、消息和图片反馈，支持减少动态效果；关闭弹窗和切换案例的草稿仅在当前页面内存保留，刷新或退出后清除。**本轮没有生产部署授权，生产仍为下述版本。**
+
 2026-09-29 经用户明确授权，生产已更新为部署 `101aa2cf`、应用源码 `c8016ce`、迁移 `0010`。教学诊断图片已上线并完成真实 Ark 识图验收，复用原有加密 Ark Secret；**网络资料计划任务仍暂停，等待两个内部用户真实扫码及核验/检索验收**。本轮仅验收教学诊断。
 
 用户已确认旧“24 位标准账号 ID”页面在刷新后变为“小红书号”。没有重复修改正确表单，也没有增加刷新脚本；不能据此认定特定缓存或预览域名是根因。
@@ -51,16 +53,19 @@ node --test tests/api.test.mjs
 node --test tests/profile.test.mjs
 node --test tests/network.test.mjs tests/network-resolution.test.mjs tests/network-binding.test.mjs
 node --test tests/diagnosis.test.mjs
+node --test tests/ui-interactions.test.mjs
 %LOCALAPPDATA%\LeduSchoolArchive\xhs-course-trial\conda-env\python.exe -m unittest tests/test_xhs_course_trial.py
 %LOCALAPPDATA%\LeduSchoolArchive\xhs-course-trial\conda-env\python.exe -m unittest tests/test_network_worker.py
 npx.cmd wrangler d1 migrations apply ledu-school-archive --local --persist-to .wrangler/state
 npx.cmd wrangler pages functions build
 ```
 
-Node 43 项、Python 18 项通过，Pages Functions 构建及全新本地 `0001`～`0010` 迁移通过。2026-09-29 内置浏览器以合成数据和模拟 AI 验证图片选择、粘贴（含只发图片）、预览移除、保存下载、失败保留与重试、1280px/390px、三个主导航、键盘焦点及控制台；无横向溢出或意外脚本错误，故障测试中的 502 为有意模拟；截图：`artifacts/school-archive-desktop.png`。模拟 AI 不代表真实 Ark 对话验收。本地验收页可用 `node tests/preview-server.mjs` 启动，仅监听本机。
+2026-10-10 Node 46 项（原 43 项 + 3 项 UI 交互检查）、Python 18 项通过，Pages Functions 构建及全新本地 `0001`～`0010` 迁移通过。内置浏览器在 1280px 与实际 390px 下检查登录、三个主导航、学校卡片来源展开、网络资料表单、诊断创建/聊天/结论、原生图片选择、粘贴与仅图片回答、放大/移除/下载、失败保留与重试、弹窗及案例草稿、键盘焦点；无横向溢出或脚本/控制台错误。有意模拟的 AI 失败不是生产故障。减少动态效果由 CSS 和 UI 自动检查覆盖；未对其他浏览器逐一实测。截图为本地合成数据：`artifacts/school-archive-desktop.png`、`artifacts/school-archive-mobile.jpg`。预览登录入口 `/login` 使用模拟身份及模拟验证，不连接真实登录服务。
+
+历史图片验收：2026-09-29 内置浏览器以合成数据和模拟 AI 验证图片选择、粘贴（含只发图片）、预览移除、保存下载、失败保留与重试、1280px/390px、三个主导航、键盘焦点及控制台；无横向溢出或意外脚本错误，故障测试中的 502 为有意模拟；截图：`artifacts/school-archive-desktop.png`。模拟 AI 不代表真实 Ark 对话验收。本地验收页可用 `node tests/preview-server.mjs` 启动，仅监听本机。
 
 2026-09-29 生产 `0010` 已应用，原有数据行数保持一致且外键检查通过；Pages 生产部署 `101aa2cf` 对应应用源码 `c8016ce`。正式首页 200 且与源码一致，未登录诊断及图片接口返回 401。现有加密 `ARK_API_KEY` 绑定保留，未读取或修改 Secret。
 
-登录正式站后，用两个合成课堂案例完成真实 Ark 验收：创建时粘贴图片、文字触发追问后仅图片回答，AI 准确读出只在图片中的两位数乘法进位、7/12 人出错和未复测事实；刷新后重新进入诊断，图片与结论仍完整。390px 无横向溢出，键盘焦点可见，控制台无错误。`artifacts/school-archive-desktop.png` 现为正式站验收截图。AI 自行给出的 1/5、1/6 有效性阈值未经教学校准，不能视作已验证标准；通过的是图片识别及保存流程。生产故障注入、第二用户隔离未实测，相关失败与隔离边界由本地测试覆盖。
+登录正式站后，用两个合成课堂案例完成真实 Ark 验收：创建时粘贴图片、文字触发追问后仅图片回答，AI 准确读出只在图片中的两位数乘法进位、7/12 人出错和未复测事实；刷新后重新进入诊断，图片与结论仍完整。390px 无横向溢出，键盘焦点可见，控制台无错误。当时保存了正式站验收截图，现已由 2026-10-10 本地 UI 截图替换。AI 自行给出的 1/5、1/6 有效性阈值未经教学校准，不能视作已验证标准；通过的是图片识别及保存流程。生产故障注入、第二用户隔离未实测，相关失败与隔离边界由本地测试覆盖。
 
 既有扫码绑定事项的生产授权与剩余验收见 `AGENTS.md` 和 `handoff.md`。代码仓库：https://github.com/zhipeng-yu/Intelligence-System

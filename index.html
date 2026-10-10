@@ -4,310 +4,280 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="referrer" content="no-referrer">
-  <meta name="description" content="目标学校A学校画像系统">
-  <title>学校画像系统｜乐读</title>
+  <meta name="description" content="乐读内部资料库：学校资料、网络资料与教学诊断">
+  <title>内部资料库｜乐读</title>
   <style>
     :root {
-      --paper: #f3f0e8;
-      --paper-deep: #e8e2d4;
-      --ink: #122a2e;
-      --ink-soft: #5f6f6f;
-      --line: #c9c3b6;
-      --red: #d94834;
-      --red-dark: #a92d20;
-      --yellow: #e8c35b;
-      --white: #fffdf8;
-      --green: #1f6654;
-      --shadow: 0 16px 40px rgba(18, 42, 46, .08);
-      --display: "STZhongsong", "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif;
-      --body: "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+      color-scheme: light;
+      --paper: #f5f5f7; --paper-deep: #eaeaec; --white: #fff;
+      --ink: #202124; --ink-soft: #62646a; --line: #dedee3;
+      --red: #b83d32; --red-dark: #a53229; --tint: #fbefec;
+      --yellow: #1769c2; --green: #276747;
+      --shadow: 0 4px 20px rgb(32 33 36 / 3%);
+      --body: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      --display: var(--body); --ease: cubic-bezier(.2,.8,.2,1);
     }
-
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
-    body {
-      margin: 0;
-      color: var(--ink);
-      background:
-        linear-gradient(rgba(18, 42, 46, .035) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(18, 42, 46, .035) 1px, transparent 1px),
-        var(--paper);
-      background-size: 30px 30px;
-      font: 14px/1.6 var(--body);
-    }
-
-    button, input, textarea, select { font: inherit; }
-    button { color: inherit; }
-    a:focus-visible, button:focus-visible, input:focus-visible,
-    textarea:focus-visible, select:focus-visible, summary:focus-visible {
-      outline: 3px solid var(--yellow);
-      outline-offset: 3px;
-    }
-
-    .app-shell {
-      min-height: 100vh;
-      display: grid;
-      grid-template-columns: 220px minmax(0, 1fr);
-    }
-
-    .sidebar {
-      position: sticky;
-      top: 0;
-      height: 100vh;
-      padding: 30px 22px;
-      color: #f8f4ea;
-      background: var(--ink);
-      border-right: 5px solid var(--red);
-    }
-
-    .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 44px; }
-    .brand-mark {
-      width: 42px;
-      height: 42px;
-      display: grid;
-      place-items: center;
-      background: var(--red);
-      border: 1px solid rgba(255, 255, 255, .45);
-      font: 700 21px/1 var(--display);
-      transform: rotate(-3deg);
-    }
-    .brand strong { display: block; font: 700 17px/1.2 var(--display); letter-spacing: .08em; }
-    .brand span { color: rgba(255, 255, 255, .54); font-size: 10px; letter-spacing: .14em; }
-    .side-label { margin: 0 0 12px 12px; color: rgba(255, 255, 255, .42); font-size: 10px; letter-spacing: .18em; }
-    .side-nav { display: grid; gap: 5px; }
-    .side-nav button {
-      width: 100%;
-      min-height: 44px;
-      padding: 11px 13px;
-      color: rgba(255, 255, 255, .72);
-      text-align: left;
-      background: transparent;
-      border: 0;
-      border-left: 2px solid transparent;
-      cursor: pointer;
-    }
-    .side-nav button:hover, .side-nav button.active { color: #fff; background: rgba(255, 255, 255, .07); border-left-color: var(--yellow); }
-    .side-note { margin-top: 50px; padding: 17px 15px; border: 1px solid rgba(255, 255, 255, .13); }
-    .side-note span { color: var(--yellow); font-size: 11px; letter-spacing: .12em; }
-    .side-note p { margin: 9px 0 0; color: rgba(255, 255, 255, .7); font: 15px/1.7 var(--display); }
-    .mobile-context { display: none; }
     [hidden] { display: none !important; }
-
-    .login-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
-    .login-card { width: min(440px, 100%); padding: 30px; border-top: 5px solid var(--red); }
-    .login-card h1 { margin-bottom: 10px; }
-    .login-card p { color: var(--ink-soft); }
-    .login-card input, .compact-form input, .compact-form select {
-      width: 100%; min-height: 42px; padding: 8px 10px; color: var(--ink);
-      background: var(--white); border: 1px solid var(--ink);
-    }
-    .login-actions { display: grid; gap: 14px; margin-top: 18px; }
-
-    main { min-width: 0; padding: 32px clamp(22px, 4vw, 62px) 54px; }
-    .topbar, .section-heading, .summary, .update-row, .footer {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 18px;
-    }
-    .topbar { margin-bottom: 25px; }
-    .eyebrow { display: block; margin-bottom: 7px; color: var(--red-dark); font-size: 11px; font-weight: 700; letter-spacing: .18em; }
+    html { scroll-padding: 24px; }
+    body { margin: 0; color: var(--ink); background: var(--paper); font: 15px/1.65 var(--body); -webkit-font-smoothing: antialiased; }
+    button, input, textarea, select { font: inherit; }
+    button, a, summary, input::file-selector-button { touch-action: manipulation; }
+    button { color: inherit; cursor: pointer; }
+    a { color: var(--red-dark); text-underline-offset: 4px; }
+    :is(a, button, input, textarea, select, summary, [tabindex]):focus-visible { outline: 3px solid var(--yellow); outline-offset: 4px; }
+    button { transition: background-color 160ms, border-color 160ms, box-shadow 160ms, transform 120ms var(--ease); }
+    button:active:not(:disabled) { transform: scale(.98); }
+    button:disabled, input:disabled, textarea:disabled { cursor: not-allowed; opacity: .55; }
     h1, h2, h3, p { margin-top: 0; }
-    h1 { margin-bottom: 0; font: 800 clamp(30px, 4vw, 50px)/1.08 var(--display); letter-spacing: -.04em; }
-    h2 { margin-bottom: 0; font: 800 clamp(22px, 2.4vw, 30px)/1.2 var(--display); }
-    h3 { margin-bottom: 0; font: 700 18px/1.35 var(--display); }
-    .mode-badge { padding: 9px 12px; color: var(--white); background: var(--red); font-size: 11px; font-weight: 700; letter-spacing: .08em; }
-    .top-actions { display: flex; align-items: center; gap: 9px; }
-
-    .summary {
-      align-items: stretch;
-      padding: 26px;
-      color: var(--white);
-      background: var(--ink);
-      box-shadow: var(--shadow);
-    }
-    .summary .eyebrow { color: var(--yellow); }
-    .summary-copy { max-width: 680px; }
-    .summary-copy h2 { font-size: clamp(25px, 3vw, 36px); }
-    .summary-copy p { margin: 12px 0 0; color: rgba(255, 255, 255, .65); }
-    .completion { min-width: 220px; align-self: center; padding: 17px 18px; border: 1px solid rgba(255, 255, 255, .2); }
-    .completion span { display: block; color: rgba(255, 255, 255, .55); font-size: 10px; letter-spacing: .12em; }
-    .completion strong { display: block; margin-top: 7px; color: var(--yellow); font: 700 20px/1.3 var(--display); }
-    .completion .budget-detail { margin-top: 5px; letter-spacing: 0; }
-
-    .section { margin-top: 46px; scroll-margin-top: 20px; }
-    .section-heading { margin-bottom: 17px; }
-    .section-heading p { margin-bottom: 0; color: var(--ink-soft); font-size: 12px; }
-    .profile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-    .profile-card {
-      min-height: 235px;
-      display: flex;
-      flex-direction: column;
-      padding: 21px;
-      background: rgba(255, 253, 248, .9);
-      border: 1px solid var(--line);
-      border-top: 4px solid var(--ink);
-      box-shadow: var(--shadow);
-    }
-    .profile-card:nth-child(4n + 1), .profile-card:nth-child(4n + 4) { border-top-color: var(--red); }
-    .card-number { color: var(--red-dark); font: 700 11px/1 var(--display); letter-spacing: .1em; }
-    .profile-card h3 { margin-top: 10px; }
-    .card-content { flex: 1; margin: 14px 0; padding-left: 20px; }
+    h1, h2, h3 { overflow-wrap: anywhere; text-wrap: balance; }
+    h1 { margin: 0; font: 650 clamp(28px,3vw,36px)/1.3 var(--display); letter-spacing: -.035em; }
+    h2 { margin: 0; font: 650 24px/1.4 var(--display); letter-spacing: -.025em; }
+    h3 { margin: 0; font: 600 18px/1.45 var(--display); }
+    .eyebrow { display: block; margin-bottom: 8px; color: var(--ink-soft); font-size: 11px; font-weight: 600; letter-spacing: .12em; }
+    .app-shell { min-height: 100vh; display: grid; grid-template-columns: 220px minmax(0,1fr); }
+    .sidebar { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; padding: 32px 18px 24px; background: #f0f0f3; border-right: 1px solid var(--line); }
+    .brand { display: flex; align-items: center; gap: 11px; margin: 0 12px 48px; }
+    .brand-mark { flex-shrink: 0; width: 40px; height: 40px; display: grid; place-items: center; color: white; background: var(--red); border-radius: 12px; font-size: 21px; font-weight: 600; }
+    .brand strong { display: block; font-size: 17px; font-weight: 650; }
+    .brand span { color: var(--ink-soft); font-size: 11px; }
+    .side-label { margin: 0 14px 12px; color: var(--ink-soft); font-size: 11px; }
+    .side-nav { display: grid; gap: 8px; }
+    .side-nav button { display: flex; align-items: center; gap: 12px; min-height: 48px; width: 100%; padding: 12px 14px; border: 1px solid transparent; border-radius: 11px; text-align: left; background: transparent; color: var(--ink-soft); }
+    .side-nav button:hover { background: #e7e7eb; color: var(--ink); }
+    .side-nav button.active { color: var(--red-dark); background: var(--white); border-color: var(--line); box-shadow: 0 2px 5px rgb(0 0 0 / 3%); font-weight: 600; }
+    .nav-icon { width: 20px; height: 20px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+    .side-note { margin: auto 14px 0; padding-top: 28px; }
+    .side-note span { font-size: 12px; font-weight: 600; }
+    .side-note p { margin: 8px 0 0; color: var(--ink-soft); font-size: 12px; }
+    .mobile-context { display: none; }
+    main { min-width: 0; width: 100%; max-width: 1400px; margin: 0 auto; padding: 38px clamp(24px,4vw,60px) 36px; }
+    .topbar, .section-heading, .summary, .update-row, .footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+    .topbar { margin-bottom: 32px; }
+    .top-actions { display: flex; align-items: center; gap: 12px; }
+    .mode-badge { color: var(--ink-soft); font-size: 12px; }
+    .summary { padding: 28px 30px; border: 1px solid var(--line); border-radius: 20px; background: var(--white); }
+    .summary-copy { max-width: 640px; }
+    .summary-copy .eyebrow { color: var(--red-dark); }
+    .summary-copy h2 { font-size: 26px; }
+    .summary-copy p { margin: 10px 0 0; color: var(--ink-soft); font-size: 14px; }
+    .completion { flex-shrink: 0; min-width: 200px; padding: 18px 20px; border-radius: 14px; background: var(--paper); }
+    .completion span { display: block; color: var(--ink-soft); font-size: 12px; }
+    .completion strong { display: block; margin-top: 5px; font: 600 18px/1.5 var(--display); font-variant-numeric: tabular-nums; }
+    .completion .budget-detail { margin-top: 4px; font-size: 11px; }
+    .section { margin-top: 32px; scroll-margin-top: 24px; }
+    .section-heading { margin-bottom: 20px; align-items: flex-start; }
+    .section-heading p { margin: 8px 0 0; color: var(--ink-soft); font-size: 12px; }
+    .profile-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+    .profile-card { display: flex; flex-direction: column; min-height: 230px; padding: 24px; background: var(--white); border: 1px solid var(--line); border-radius: 16px; }
+    .card-number { color: var(--red-dark); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .profile-card h3 { margin-top: 12px; }
+    .card-content { flex: 1; margin: 16px 0 20px; padding-left: 20px; }
     p.card-content { padding-left: 0; }
-    .card-content li + li { margin-top: 5px; }
-    .card-content.empty { color: var(--ink-soft); }
-    .card-meta { color: var(--ink-soft); font-size: 10px; }
-    details { margin-top: 9px; }
-    summary { width: fit-content; color: var(--red-dark); cursor: pointer; font-size: 11px; font-weight: 700; }
-    details p, details ul { margin: 7px 0 0; color: var(--ink-soft); font-size: 11px; }
-    details ul { padding-left: 18px; }
-    .profile-actions, .update-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
-    .profile-actions[hidden] { display: none; }
-
-    .panel { padding: 22px; background: rgba(255, 253, 248, .9); border: 1px solid var(--line); box-shadow: var(--shadow); }
-    .upload-panel { border-top: 4px solid var(--red); }
-    .upload-form { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(220px, 1fr); gap: 15px; }
-    .form-field label { display: block; margin-bottom: 7px; color: var(--ink-soft); font-size: 11px; font-weight: 700; }
-    .file-drop {
-      min-height: 116px;
-      display: grid;
-      place-items: center;
-      padding: 18px;
-      text-align: center;
-      background: var(--white);
-      border: 1px dashed var(--ink);
-    }
-    .file-drop.dragging { background: var(--paper-deep); border-style: solid; }
-    .file-drop input { width: 100%; margin-top: 9px; }
-    textarea { width: 100%; min-height: 116px; padding: 11px; color: var(--ink); background: var(--white); border: 1px solid var(--ink); resize: vertical; }
-    .upload-submit { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 15px; margin-top: 16px; }
+    .card-content li + li { margin-top: 6px; }
+    .card-content.empty, .card-meta { color: var(--ink-soft); }
+    .card-meta { font-size: 12px; }
+    details { margin-top: 10px; }
+    summary { width: fit-content; min-height: 44px; display: list-item; padding: 10px 0; color: var(--red-dark); cursor: pointer; font-size: 13px; }
+    details p, details ul { margin: 6px 0; color: var(--ink-soft); font-size: 13px; }
+    details ul { padding-left: 20px; }
+    .panel { padding: 26px; background: var(--white); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); min-width: 0; }
+    .upload-form { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(220px,1fr); gap: 24px; }
+    .form-field { min-width: 0; }
+    .form-field label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600; }
+    input:not([type=file]), select, textarea { width: 100%; min-height: 46px; padding: 11px 14px; color: var(--ink); background: var(--white); border: 1px solid #8e9097; border-radius: 10px; transition: border-color 160ms, box-shadow 160ms; }
+    textarea { min-height: 120px; resize: vertical; line-height: 1.65; }
+    textarea::placeholder, input::placeholder { color: var(--ink-soft); }
+    input:not([type=file]):hover, select:hover, textarea:hover { border-color: var(--ink-soft); }
+    input[type=file] { width: 100%; max-width: 100%; min-height: 44px; color: var(--ink-soft); font-size: 13px; }
+    input::file-selector-button { min-height: 44px; padding: 0 14px; margin-right: 10px; color: var(--ink); background: var(--paper); border: 1px solid #8e9097; border-radius: 10px; font: inherit; cursor: pointer; }
+    .file-drop { min-height: 120px; display: grid; place-items: center; padding: 18px; background: var(--paper); border: 1px dashed #8e9097; border-radius: 12px; text-align: center; }
+    .file-drop input { margin-top: 10px; }
+    .file-drop.dragging { background: var(--tint); border-color: var(--red); }
+    .upload-submit { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: end; gap: 16px; margin-top: 20px; }
     .turnstile-slot:empty { display: none; }
-    .primary-button, .action-button {
-      min-height: 40px;
-      padding: 0 13px;
-      border: 1px solid var(--ink);
-      cursor: pointer;
-    }
-    .primary-button { min-width: 180px; color: var(--white); background: var(--ink); font-weight: 700; }
-    .action-button { background: transparent; }
-    .action-button:hover { background: var(--paper-deep); }
-    .action-button.danger { color: var(--red-dark); border-color: var(--red-dark); }
-    button:disabled, input:disabled, textarea:disabled { cursor: not-allowed; opacity: .56; }
-    .privacy-note { margin: 15px 0 0; padding: 12px 14px; color: var(--red-dark); background: #f5ded9; font-size: 11px; }
-    .notice { margin: 12px 0 0; color: var(--ink-soft); font-size: 11px; }
+    .primary-button, .action-button { min-height: 44px; padding: 10px 18px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; font-weight: 500; }
+    .primary-button { color: var(--white); background: var(--red); border-color: var(--red); }
+    .primary-button:hover:not(:disabled) { background: var(--red-dark); border-color: var(--red-dark); box-shadow: 0 3px 10px rgb(184 61 50 / 16%); }
+    .action-button { background: var(--white); }
+    .action-button:hover:not(:disabled) { background: var(--paper); border-color: #8e9097; }
+    .action-button.danger { color: var(--red-dark); }
+    .privacy-note { margin: 20px 0 0; padding: 12px 16px; color: var(--red-dark); background: var(--tint); border-radius: 10px; font-size: 12px; }
+    .notice { margin: 12px 0 0; color: var(--ink-soft); font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
     .notice:empty { display: none; }
-    .notice.error { color: var(--red-dark); }
+    .notice.error { color: var(--red-dark); background: var(--tint); padding: 12px 14px; border-radius: 10px; }
     .notice.success { color: var(--green); }
-
-    .split-grid { display: grid; grid-template-columns: minmax(260px, .8fr) minmax(0, 1.2fr); gap: 14px; }
-    .compact-form { display: grid; gap: 11px; }
+    .profile-actions, .update-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .split-grid { display: grid; grid-template-columns: minmax(260px,.9fr) minmax(0,1.1fr); gap: 20px; }
+    .compact-form { display: grid; gap: 18px; }
     .compact-form.two-column { grid-template-columns: 1fr 1fr; }
     .compact-form .wide { grid-column: 1 / -1; }
-    .item-list { display: grid; gap: 8px; margin-top: 15px; }
-    .item-row { padding: 12px; background: var(--white); border: 1px solid var(--line); }
-    .item-row-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-    .item-row strong { overflow-wrap: anywhere; }
-    .search-results { display: grid; gap: 8px; margin-top: 12px; }
-    .result-card { padding: 13px; background: var(--paper); border-left: 3px solid var(--red); }
-    .result-card a { color: var(--red-dark); font-weight: 700; overflow-wrap: anywhere; }
-    .result-card p { margin: 7px 0 0; }
-    .result-meta { color: var(--ink-soft); font-size: 10px; }
-    .failure-list { margin: 10px 0 0; color: var(--red-dark); }
-
-    .diagnosis-layout { display: grid; grid-template-columns: minmax(210px, .35fr) minmax(0, 1fr); align-items: start; gap: 14px; }
-    .diagnosis-history h3 { margin-bottom: 10px; }
-    .diagnosis-case-list { display: grid; gap: 7px; }
-    .diagnosis-case {
-      width: 100%; min-height: 66px; padding: 11px 12px; text-align: left;
-      background: var(--white); border: 1px solid var(--line); cursor: pointer;
-    }
-    .diagnosis-case:hover, .diagnosis-case.active { border-color: var(--red); box-shadow: inset 4px 0 var(--red); }
-    .diagnosis-case strong, .diagnosis-case span { display: block; }
-    .diagnosis-case span { margin-top: 4px; color: var(--ink-soft); font-size: 10px; }
-    .diagnosis-original { margin: 15px 0; padding: 13px 15px; background: var(--paper); border-left: 3px solid var(--red); }
-    .diagnosis-original strong { display: block; margin-bottom: 4px; }
-    .diagnosis-interview { display: grid; gap: 10px; margin: 18px 0; }
-    .diagnosis-message { max-width: 86%; padding: 12px 14px; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--paper); border-left: 3px solid var(--red); }
-    .diagnosis-message.teaching { justify-self: end; background: var(--white); border: 1px solid var(--line); border-left: 1px solid var(--line); }
-    .diagnosis-message strong { display: block; margin-bottom: 5px; color: var(--red-dark); font-size: 10px; letter-spacing: .08em; }
-    .diagnosis-answer { padding-top: 16px; border-top: 1px solid var(--line); }
-    .diagnosis-result { padding: 18px; background: var(--paper); border-top: 4px solid var(--red); }
-    .diagnosis-result h3 { margin-bottom: 14px; }
-    .diagnosis-result h4 { margin: 14px 0 5px; color: var(--red-dark); font-size: 11px; letter-spacing: .08em; }
-    .diagnosis-result p, .diagnosis-result ul { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+    #accountForm, #searchForm { margin-top: 22px; }
+    #bindingQr { margin-top: 20px; max-width: 100%; border-radius: 12px; }
+    #bindingStatus { color: var(--ink); font-weight: 600; }
+    .item-list, .updates { display: grid; gap: 12px; margin-top: 20px; }
+    .item-row, .update-row { padding: 18px 20px; background: var(--white); border: 1px solid var(--line); border-radius: 12px; }
+    .item-row-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .item-row strong, .update-copy { min-width: 0; overflow-wrap: anywhere; }
+    .update-row { align-items: flex-start; }
+    .update-copy strong { display: block; font-size: 15px; font-weight: 600; }
+    .update-meta, .result-meta { display: block; margin-top: 6px; color: var(--ink-soft); font-size: 12px; }
+    .status { display: inline-block; width: fit-content; margin-top: 8px; padding: 4px 10px; color: var(--ink-soft); background: var(--paper-deep); border-radius: 7px; font-size: 12px; }
+    .status.completed { color: var(--green); background: #edf6ef; }
+    .status.failed, .status.blocked { color: var(--red-dark); background: var(--tint); }
+    .status.processing, .status.running, .status.queued { color: #835317; background: #fbf2df; }
+    .search-results { display: grid; gap: 12px; margin-top: 16px; }
+    .result-card { padding: 18px; border: 1px solid var(--line); background: var(--paper); border-radius: 12px; }
+    .result-card a { font-weight: 600; overflow-wrap: anywhere; }
+    .result-card p { margin: 10px 0 0; }
+    .failure-list { margin: 12px 0 0; color: var(--red-dark); }
+    .empty-state { padding: 32px 20px; color: var(--ink-soft); text-align: center; background: var(--paper); border: 1px dashed var(--line); border-radius: 12px; font-size: 14px; }
+    .diagnosis-layout { display: grid; grid-template-columns: 232px minmax(0,1fr); align-items: start; gap: 24px; }
+    .diagnosis-history { padding: 18px 12px; background: transparent; box-shadow: none; border-color: transparent; }
+    .diagnosis-history h3 { padding: 0 10px; margin-bottom: 18px; font-size: 14px; }
+    .diagnosis-case-list { display: grid; gap: 8px; }
+    .diagnosis-case { width: 100%; min-height: 78px; padding: 14px 12px; text-align: left; background: transparent; border: 1px solid transparent; border-radius: 12px; }
+    .diagnosis-case:hover { background: var(--paper-deep); }
+    .diagnosis-case.active { background: var(--white); border-color: var(--line); box-shadow: var(--shadow); }
+    .diagnosis-case strong, .diagnosis-case span { display: block; overflow-wrap: anywhere; }
+    .diagnosis-case strong { font-size: 14px; font-weight: 600; }
+    .diagnosis-case span { margin-top: 6px; color: var(--ink-soft); font-size: 12px; }
+    .diagnosis-case.active strong { color: var(--red-dark); }
+    #diagnosisWorkspace { padding: 28px; scroll-margin-top: 24px; }
+    #diagnosisCaseTitle { font-size: 23px; }
+    .diagnosis-original { margin: 24px 0; padding: 18px 20px; background: var(--paper); border-radius: 12px; overflow-wrap: anywhere; }
+    .diagnosis-original strong { display: block; margin-bottom: 8px; font-size: 12px; color: var(--ink-soft); }
+    .diagnosis-original > span { white-space: pre-wrap; }
+    .diagnosis-interview { display: grid; gap: 24px; margin: 28px 0; }
+    .diagnosis-message { max-width: 92%; padding: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.85; }
+    .diagnosis-message.teaching { justify-self: end; padding: 16px 20px; background: var(--tint); border-radius: 16px 16px 4px 16px; }
+    .diagnosis-message strong { display: block; margin-bottom: 8px; color: var(--ink-soft); font-size: 12px; font-weight: 500; }
+    .diagnosis-message:not(.teaching) strong { color: var(--red-dark); font-weight: 600; }
+    .diagnosis-answer { margin-top: 28px; padding: 24px 0 0; border-top: 1px solid var(--line); }
+    .diagnosis-answer textarea { min-height: 112px; background: var(--paper); }
+    .diagnosis-answer > .primary-button { justify-self: end; min-width: 150px; }
+    .attachment-field { padding: 16px; background: var(--paper); border-radius: 12px; }
+    .attachment-field .notice { font-size: 12px; }
+    .diagnosis-images { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0 0; }
+    .diagnosis-images:empty { display: none; }
+    .diagnosis-image { position: relative; margin: 0; width: 152px; max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
+    .diagnosis-image img { display: block; width: 100%; height: 114px; object-fit: contain; background: var(--white); border: 1px solid var(--line); border-radius: 10px; transition: transform 180ms var(--ease); }
+    .diagnosis-image a:hover img, .diagnosis-image button:hover img { transform: scale(1.025); }
+    .diagnosis-image figcaption { margin: 8px 0 2px; color: var(--ink-soft); font-size: 12px; }
+    .diagnosis-image a { display: inline-flex; align-items: center; min-height: 44px; font-size: 12px; }
+    .image-preview-button { display: block; width: 100%; padding: 0; background: transparent; border: 0; border-radius: 10px; }
+    .diagnosis-result { padding: 24px; background: #f7f8fa; border: 1px solid var(--line); border-radius: 16px; }
+    .diagnosis-result > .eyebrow { color: var(--green); }
+    .diagnosis-result h3 { margin-bottom: 24px; font-size: 23px; }
+    .conclusion-section + .conclusion-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
+    .conclusion-section h4 { margin: 0 0 10px; font-size: 14px; font-weight: 650; }
+    .conclusion-section h4 span { display: inline-grid; place-items: center; width: 26px; height: 26px; margin-right: 8px; color: var(--red-dark); background: var(--tint); border-radius: 7px; font-size: 12px; }
+    .diagnosis-result p, .diagnosis-result ul { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.85; }
     .diagnosis-result ul { padding-left: 20px; }
-    .diagnosis-images { display: flex; flex-wrap: wrap; gap: 12px; margin: 10px 0; }
-    .diagnosis-image { margin: 0; width: 160px; max-width: 100%; overflow-wrap: anywhere; white-space: normal; }
-    .diagnosis-image img { display: block; width: 100%; height: 120px; object-fit: contain; background: var(--paper); border: 1px solid var(--line); }
-    .diagnosis-image figcaption { margin: 5px 0; font-size: 12px; }
-    .diagnosis-image a, .diagnosis-image button { display: inline-flex; align-items: center; min-height: 44px; }
-    .diagnosis-image-input { width: 100%; min-height: 44px; }
-    dialog { width: min(560px, calc(100% - 30px)); padding: 0; color: var(--ink); background: var(--paper); border: 1px solid var(--ink); box-shadow: var(--shadow); }
-    dialog::backdrop { background: rgba(18, 42, 46, .58); }
-    .dialog-panel { padding: 24px; }
-    .dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; margin-bottom: 18px; }
-    .summary > .primary-button { align-self: center; color: var(--white); background: var(--red); border-color: var(--white); }
-
-    .updates { display: grid; gap: 9px; }
-    .update-row { align-items: flex-start; padding: 16px 18px; background: rgba(255, 253, 248, .9); border: 1px solid var(--line); }
-    .update-copy { min-width: 0; }
-    .update-copy strong { display: block; overflow-wrap: anywhere; font: 700 15px/1.45 var(--display); }
-    .update-meta { display: block; margin-top: 5px; color: var(--ink-soft); font-size: 10px; }
-    .status { display: inline-block; margin-top: 8px; padding: 4px 7px; background: var(--paper-deep); font-size: 10px; }
-    .status.completed { color: var(--green); background: #deeee7; }
-    .status.failed { color: var(--red-dark); background: #f5ded9; }
-    .status.processing { color: #8c4e18; background: #f5e6c6; }
-    .status.undone { color: var(--ink-soft); }
-    .empty-state { padding: 38px 18px; color: var(--ink-soft); text-align: center; background: rgba(255, 253, 248, .9); border: 1px solid var(--line); }
-    .footer { align-items: flex-start; margin-top: 42px; padding-top: 17px; color: var(--ink-soft); border-top: 1px solid var(--line); font-size: 10px; }
-
-    @media (max-width: 900px) {
-      .app-shell { grid-template-columns: 78px minmax(0, 1fr); }
-      .sidebar { padding: 25px 12px; }
-      .brand { justify-content: center; }
-      .brand div:last-child, .side-label, .side-nav span, .side-note { display: none; }
-      .side-nav button { padding: 11px 6px; text-align: center; }
-      .side-nav button::before { content: attr(data-short); font: 700 14px/1 var(--display); }
+    .diagnosis-result li + li { margin-top: 6px; }
+    .diagnosis-empty { display: grid; place-items: center; min-height: 280px; padding: 48px 28px; background: var(--white); border: 1px solid var(--line); border-radius: 18px; text-align: center; }
+    .diagnosis-empty h3 { margin: 16px 0 10px; }
+    .diagnosis-empty p { color: var(--ink-soft); max-width: 380px; margin-bottom: 0; font-size: 14px; }
+    .diagnosis-empty .nav-icon { width: 36px; height: 36px; color: var(--red-dark); }
+    dialog { width: min(580px,calc(100% - 32px)); max-height: calc(100dvh - 48px); padding: 0; color: var(--ink); background: var(--white); border: 1px solid var(--line); border-radius: 20px; box-shadow: 0 24px 100px rgb(0 0 0 / 18%); opacity: 0; transform: translateY(8px) scale(.985); transition: opacity 180ms var(--ease), transform 180ms var(--ease), display 180ms allow-discrete, overlay 180ms allow-discrete; }
+    dialog[open] { opacity: 1; transform: none; }
+    dialog::backdrop { background: rgb(20 22 28 / 35%); opacity: 0; transition: opacity 180ms, display 180ms allow-discrete, overlay 180ms allow-discrete; }
+    dialog[open]::backdrop { opacity: 1; }
+    @starting-style { dialog[open] { opacity: 0; transform: translateY(8px) scale(.985); } dialog[open]::backdrop { opacity: 0; } }
+    .dialog-panel { padding: 28px; }
+    .dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 24px; }
+    #imagePreviewDialog { width: min(900px,calc(100% - 32px)); }
+    #imagePreviewContent { display: block; width: 100%; max-height: 65dvh; object-fit: contain; background: var(--paper); border-radius: 12px; }
+    .login-screen { min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
+    .login-card { width: min(460px,100%); padding: 40px; border-radius: 24px; box-shadow: 0 12px 50px rgb(32 33 36 / 5%); }
+    .login-card .brand { margin: 0 0 38px; }
+    .login-card h1 { font-size: 30px; margin-bottom: 12px; }
+    .login-card > p { color: var(--ink-soft); font-size: 14px; }
+    .login-card form { margin-top: 30px; }
+    .login-actions { display: grid; gap: 16px; margin-top: 24px; }
+    .footer { margin-top: 40px; padding-top: 20px; color: var(--ink-soft); border-top: 1px solid var(--line); font-size: 12px; }
+    .message-enter, .image-enter { animation: appear 220ms var(--ease) both; }
+    [aria-busy=true] > .primary-button::after { content: ''; display: inline-block; width: 12px; height: 12px; margin-left: 10px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 800ms linear infinite; vertical-align: -2px; }
+    @keyframes appear { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (max-width: 1100px) {
+      .app-shell { grid-template-columns: 190px minmax(0,1fr); }
+      main { padding: 32px 28px; }
+      .diagnosis-layout { grid-template-columns: 190px minmax(0,1fr); gap: 16px; }
+      .summary { padding: 24px; }
     }
-
-    @media (max-width: 680px) {
-      .app-shell { display: block; }
-      .sidebar { position: static; height: auto; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-right: 0; border-bottom: 4px solid var(--red); }
-      .brand { margin: 0; }
-      .brand-mark { width: 35px; height: 35px; }
-      .side-label, .side-note, .mobile-context { display: none; }
-      .side-nav { display: flex; gap: 5px; margin-left: auto; }
-      .side-nav button { padding: 8px 10px; }
-      .side-nav button::before { content: none; }
-      .side-nav span { display: inline; }
-      main { padding: 23px 15px 42px; }
-      .topbar, .section-heading, .summary, .update-row, .footer { align-items: flex-start; }
-      .summary, .update-row, .footer { flex-direction: column; }
-      .completion { width: 100%; }
-      .profile-grid, .upload-form, .split-grid, .compact-form.two-column,
+    @media (max-width: 850px) {
+      .app-shell { grid-template-columns: 80px minmax(0,1fr); }
+      .sidebar { padding: 24px 12px; }
+      .brand { margin: 0 auto 32px; }
+      .sidebar .brand > div:last-child, .side-label, .side-note, .side-nav span { display: none; }
+      .side-nav button { justify-content: center; padding: 12px; }
       .diagnosis-layout { grid-template-columns: 1fr; }
+      .diagnosis-history { padding: 0; }
+      .diagnosis-case-list { grid-template-columns: repeat(2,minmax(0,1fr)); }
+      .summary { flex-wrap: wrap; }
+      .split-grid { grid-template-columns: 1fr; }
+      .upload-form { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 680px) {
+      html { scroll-padding-top: 96px; }
+      .app-shell { display: block; }
+      .sidebar { position: sticky; z-index: 10; height: auto; display: flex; flex-direction: row; align-items: center; gap: 10px; padding: 12px 16px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .sidebar .brand { margin: 0; }
+      .brand-mark { width: 36px; height: 36px; border-radius: 10px; font-size: 19px; }
+      .side-nav { display: flex; flex: 1; gap: 4px; }
+      .side-nav button { flex: 1; min-width: 0; min-height: 44px; padding: 10px 7px; font-size: 13px; gap: 0; }
+      .side-nav span { display: inline; white-space: nowrap; }
+      .side-nav .nav-icon { display: none; }
+      main { padding: 24px 16px 32px; }
+      .topbar { align-items: center; margin-bottom: 24px; gap: 8px; }
+      .topbar .eyebrow { font-size: 10px; letter-spacing: .08em; }
+      .top-actions { gap: 8px; }
+      .mode-badge { display: none; }
+      .top-actions .action-button { padding: 8px 12px; }
+      h1 { font-size: 28px; }
+      h2 { font-size: 22px; }
+      .summary { gap: 20px; padding: 22px; border-radius: 16px; }
+      .summary-copy h2 { font-size: 23px; }
+      .completion { width: 100%; min-width: 0; padding: 14px 16px; }
+      .section { margin-top: 24px; }
+      .section-heading { flex-wrap: wrap; gap: 8px; }
+      .profile-grid, .compact-form.two-column { grid-template-columns: 1fr; }
+      .profile-card { min-height: 210px; padding: 22px; }
+      .panel { padding: 22px; border-radius: 16px; }
       .upload-submit { grid-template-columns: 1fr; }
+      input:not([type=file]), textarea, select { font-size: 16px; }
       .primary-button { width: 100%; }
-      .diagnosis-message { max-width: 94%; }
+      .update-row, .footer { flex-direction: column; align-items: flex-start; gap: 12px; }
+      .diagnosis-case-list { grid-template-columns: 1fr; }
+      .diagnosis-history { padding: 0; }
+      .diagnosis-history h3 { padding: 0; margin-bottom: 12px; }
+      #diagnosisWorkspace { padding: 20px; scroll-margin-top: 90px; }
+      #diagnosisCaseTitle { font-size: 21px; }
+      .diagnosis-message { max-width: 100%; font-size: 16px; }
+      .diagnosis-message.teaching { max-width: 94%; padding: 14px 16px; }
+      .diagnosis-original { padding: 16px; font-size: 16px; }
+      .diagnosis-result { padding: 18px; }
+      .diagnosis-result p, .diagnosis-result ul { font-size: 16px; }
+      .diagnosis-image { width: 132px; }
+      .diagnosis-image img { height: 104px; }
+      .attachment-field { padding: 14px; }
+      .dialog-panel { padding: 22px; }
+      dialog { max-height: calc(100dvh - 32px); border-radius: 16px; }
+      .dialog-heading h2 { font-size: 22px; }
+      .login-card { padding: 28px; }
     }
-
-    @media (max-width: 430px) {
-      .topbar, .section-heading { display: block; }
-      .mode-badge { display: inline-block; margin-top: 15px; }
-      .section-heading p { margin-top: 8px; }
-    }
-
     @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { scroll-behavior: auto !important; }
+      *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
     }
   </style>
 </head>
 <body>
   <section class="login-screen" id="loginScreen" aria-labelledby="loginTitle">
     <div class="panel login-card">
-      <span class="eyebrow">LEDU · INTERNAL</span>
+      <div class="brand"><div class="brand-mark">乐</div><div><strong>乐读</strong><span>内部工作空间</span></div></div>
       <h1 id="loginTitle">内部资料库</h1>
-      <p>请输入管理员预先加入白名单的中国大陆手机号。</p>
+      <p>使用已加入白名单的手机号，进入你的工作空间。</p>
       <form id="loginForm">
         <div class="form-field">
           <label for="phoneInput">手机号</label>
@@ -326,15 +296,15 @@
     <aside class="sidebar" aria-label="主导航">
       <div class="brand">
         <div class="brand-mark">乐</div>
-        <div><strong>学校画像</strong><span>School Profile</span></div>
+        <div><strong>乐读</strong><span>内部资料库</span></div>
       </div>
-      <p class="side-label">一级板块</p>
+      <p class="side-label">工作空间</p>
       <nav class="side-nav">
-        <button class="active" id="schoolNav" type="button" data-view="school" data-short="校" aria-current="page"><span>学校资料</span></button>
-        <button id="networkNav" type="button" data-view="network" data-short="网"><span>网络资料</span></button>
-        <button id="diagnosisNav" type="button" data-view="diagnosis" data-short="诊"><span>教学诊断</span></button>
+        <button class="active" id="schoolNav" type="button" aria-label="学校资料" data-view="school" data-short="校" aria-current="page"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V5l8-3 8 3v16M8 8h1m6 0h1M8 12h1m6 0h1M10 21v-5h4v5M2 21h20"/></svg><span>学校资料</span></button>
+        <button id="networkNav" type="button" aria-label="网络资料" data-view="network" data-short="网"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a18 18 0 0 1 0 18 18 18 0 0 1 0-18Z"/></svg><span>网络资料</span></button>
+        <button id="diagnosisNav" type="button" aria-label="教学诊断" data-view="diagnosis" data-short="诊"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v15H9l-4 3V3Z"/><path d="M9 7h6M9 11h4"/></svg><span>教学诊断</span></button>
       </nav>
-      <div class="side-note"><span>学校画像 2.0</span><p>上传一次，<br>信息自动整理。</p></div>
+      <div class="side-note"><span>资料有序，教学有据。</span><p>学校资料 · 网络资料<br>教学诊断</p></div>
       <span class="mobile-context">目标学校A · 学校画像</span>
     </aside>
 
@@ -366,7 +336,7 @@
 
       <section class="section" id="upload" aria-labelledby="upload-title">
         <div class="section-heading">
-          <div><span class="eyebrow">02 · UPLOAD</span><h2 id="upload-title">极简资料上传</h2></div>
+          <div><span class="eyebrow">02 · UPLOAD</span><h2 id="upload-title">上传资料</h2></div>
           <p>PDF、DOCX、XLSX · 单文件最大 50MB</p>
         </div>
         <div class="panel upload-panel">
@@ -465,25 +435,27 @@
       <div id="diagnosisView" hidden>
         <section aria-labelledby="diagnosis-title">
           <div class="summary">
-            <div class="summary-copy"><span class="eyebrow">TEACHING DIAGNOSIS</span><h2 id="diagnosis-title">教学诊断</h2><p>说说你已发现的问题或现象。AI 会根据回答追问具体场景，帮你找出主讲老师可改进的环节和解决办法。</p></div>
+            <div class="summary-copy"><span class="eyebrow">TEACHING DIAGNOSIS</span><h2 id="diagnosis-title">从现象出发，梳理教学问题</h2><p>说说你已发现的问题或现象。AI 会根据回答追问具体场景，帮你找出主讲老师可改进的环节和解决办法。</p></div>
             <button class="primary-button" id="newDiagnosisButton" type="button">开始一次诊断</button>
           </div>
         </section>
+        <p class="notice" id="diagnosisLoadMessage" role="status" aria-live="polite"></p>
         <div class="diagnosis-layout section">
           <section class="panel diagnosis-history" aria-labelledby="diagnosis-history-title">
             <h3 id="diagnosis-history-title">最近诊断</h3>
             <div class="diagnosis-case-list" id="diagnosisList"></div>
           </section>
+          <section class="diagnosis-empty" id="diagnosisEmpty"><div><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v15H9l-4 3V3Z"/><path d="M9 7h6M9 11h4"/></svg><h3>先说说你观察到的现象</h3><p>开始一次诊断，或选择左侧案例继续。AI 会逐题追问，再一起梳理解决与验证办法。</p></div></section>
           <section class="panel" id="diagnosisWorkspace" aria-labelledby="diagnosisCaseTitle" hidden>
             <div class="section-heading">
-              <div><span class="eyebrow">案例</span><h2 id="diagnosisCaseTitle"></h2></div>
+              <div><span class="eyebrow">案例</span><h2 id="diagnosisCaseTitle" tabindex="-1"></h2></div>
               <span class="status" id="diagnosisCaseStatus"></span>
             </div>
             <div class="diagnosis-original"><strong>已发现的现象</strong><span id="diagnosisOriginalFact"></span><div class="diagnosis-images" id="diagnosisOriginalImages"></div></div>
             <div class="diagnosis-interview" id="diagnosisInterview" aria-live="polite"></div>
             <form class="compact-form diagnosis-answer" id="diagnosisAnswerForm">
-              <div class="form-field"><label for="diagnosisAnswer">回答 AI 当前的问题</label><textarea id="diagnosisAnswer" maxlength="4000" required></textarea></div>
-              <div class="form-field">
+              <div class="form-field"><label for="diagnosisAnswer">补充具体事实</label><textarea id="diagnosisAnswer" maxlength="4000" placeholder="说说当时的场景、老师的动作或你观察到的事实…" required></textarea></div>
+              <div class="form-field attachment-field">
                 <label for="answerImages">添加或粘贴图片（可选）</label>
                 <input class="diagnosis-image-input" id="answerImages" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple aria-describedby="answerImagesHint answerImagesError">
                 <p class="notice" id="answerImagesHint">可在回答框直接粘贴图片。JPG、PNG、WebP，每张不超过 5MB，每次诊断累计最多 3 张。图片仅你可查看，并交给 AI 辅助分析；请先遮挡个人信息。</p>
@@ -495,10 +467,10 @@
             </form>
             <article class="diagnosis-result" id="diagnosisResult" tabindex="-1" hidden>
               <span class="eyebrow">DIAGNOSIS COMPLETE</span><h3>诊断结论</h3>
-              <h4>发现的问题</h4><p id="diagnosisProblem"></p>
-              <h4>判断依据</h4><ul id="diagnosisEvidence"></ul>
-              <h4>解决办法</h4><p id="diagnosisSolution"></p>
-              <h4>如何确认有效</h4><p id="diagnosisVerification"></p>
+              <section class="conclusion-section"><h4><span aria-hidden="true">01</span>发现的问题</h4><p id="diagnosisProblem"></p></section>
+              <section class="conclusion-section"><h4><span aria-hidden="true">02</span>判断依据</h4><ul id="diagnosisEvidence"></ul></section>
+              <section class="conclusion-section"><h4><span aria-hidden="true">03</span>解决办法</h4><p id="diagnosisSolution"></p></section>
+              <section class="conclusion-section"><h4><span aria-hidden="true">04</span>如何确认有效</h4><p id="diagnosisVerification"></p></section>
             </article>
             <p class="notice" id="diagnosisMessage" role="status" aria-live="polite"></p>
           </section>
@@ -506,8 +478,8 @@
       </div>
 
       <footer class="footer">
-        <span>乐读内部资料库 · 小规模多用户 MVP</span>
-        <span>用户隔离 · 私有文件 · 串行检索</span>
+        <span>乐读 · 内部资料库</span>
+        <span>你的资料与诊断，妥善保存</span>
       </footer>
     </main>
   </div>
@@ -517,8 +489,8 @@
       <div class="dialog-heading"><div><span class="eyebrow">START</span><h2 id="new-diagnosis-title">开始教学诊断</h2></div><button class="action-button" id="closeDiagnosisDialog" type="button">关闭</button></div>
       <form class="compact-form" id="newDiagnosisForm">
         <div class="form-field"><label for="diagnosisName">老师或案例名称</label><input id="diagnosisName" maxlength="120" required></div>
-        <div class="form-field"><label for="diagnosisPhenomenon">你已发现什么问题或现象？</label><textarea id="diagnosisPhenomenon" maxlength="4000" required></textarea></div>
-        <div class="form-field">
+        <div class="form-field"><label for="diagnosisPhenomenon">你已发现什么问题或现象？</label><textarea id="diagnosisPhenomenon" maxlength="4000" placeholder="例如：连续三周，固定几名学生没有提交作业。" required></textarea></div>
+        <div class="form-field attachment-field">
           <label for="caseImages">添加或粘贴图片（可选）</label>
           <input class="diagnosis-image-input" id="caseImages" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple aria-describedby="caseImagesHint caseImagesError">
           <p class="notice" id="caseImagesHint">可在现象描述框直接粘贴图片。JPG、PNG、WebP，每张不超过 5MB，每次诊断累计最多 3 张。图片仅你可查看，并交给 AI 辅助分析；请先遮挡个人信息。</p>
@@ -531,6 +503,8 @@
       </form>
     </div>
   </dialog>
+
+  <dialog id="imagePreviewDialog" aria-labelledby="imagePreviewTitle"><div class="dialog-panel"><div class="dialog-heading"><h2 id="imagePreviewTitle">图片预览</h2><button class="action-button" id="closeImagePreview" type="button" autofocus>关闭</button></div><img id="imagePreviewContent" alt=""><p class="notice" id="imagePreviewName"></p></div></dialog>
 
   <script>
     const STORAGE_KEY = 'school_archive_admin_key';
@@ -880,6 +854,27 @@
 
     const diagnosisDraftImages = { caseImages: [], answerImages: [] };
     let diagnosisBusy = false;
+    const answerDrafts = new Map();
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    function reveal(element) {
+      if (!reducedMotion.matches) element.animate([
+        { opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }
+      ], { duration: 220, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    }
+    function scrollToElement(element) {
+      element.scrollIntoView({ behavior: reducedMotion.matches ? 'instant' : 'smooth', block: 'start' });
+    }
+    const imagePreviewDialog = document.querySelector('#imagePreviewDialog');
+    function previewImage(src, name) {
+      document.querySelector('#imagePreviewContent').src = src;
+      document.querySelector('#imagePreviewContent').alt = name;
+      document.querySelector('#imagePreviewName').textContent = name;
+      imagePreviewDialog.showModal();
+    }
+    document.querySelector('#closeImagePreview').addEventListener('click', () => imagePreviewDialog.close());
+    imagePreviewDialog.addEventListener('close', () => document.querySelector('#imagePreviewContent').removeAttribute('src'));
+    let renderedDiagnosisId = '';
+    let renderedMessageCount = 0;
 
     function clearDiagnosisImages(id) {
       diagnosisDraftImages[id].forEach(item => URL.revokeObjectURL(item.url));
@@ -891,18 +886,40 @@
     }
 
     function renderDraftImages(id) {
-      document.getElementById(`${id}Preview`).replaceChildren(...diagnosisDraftImages[id].map((item, index) => {
+      const container = document.getElementById(`${id}Preview`);
+      const previousUrls = new Set([...container.querySelectorAll('img')].map(img => img.src));
+      container.replaceChildren(...diagnosisDraftImages[id].map(item => {
         const figure = node('figure', '', 'diagnosis-image');
         const img = node('img');
         img.src = item.url;
         img.alt = `待提交图片：${item.file.name}`;
-        figure.append(img, node('figcaption', `${item.file.name} · ${formatSize(item.file.size)}`), actionButton('移除', () => {
+        const preview = actionButton('', () => previewImage(item.url, item.file.name));
+        preview.className = 'image-preview-button';
+        preview.setAttribute('aria-label', `预览图片：${item.file.name}`);
+        preview.append(img);
+        preview.disabled = diagnosisBusy;
+        const remove = actionButton('移除', async () => {
+          if (diagnosisBusy) return;
+          const selectedAtRemoval = selectedDiagnosisId;
+          diagnosisDraftImages[id] = diagnosisDraftImages[id].filter(value => value !== item);
+          if (id === 'answerImages') document.querySelector('#diagnosisAnswer').required = !diagnosisDraftImages[id].length;
+          remove.disabled = true;
+          preview.disabled = true;
+          if (!reducedMotion.matches) {
+            await figure.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.95)' }],
+              { duration: 120, easing: 'ease-in', fill: 'forwards' }).finished.catch(() => {});
+          }
+          const restoreFocus = figure.isConnected && selectedAtRemoval === selectedDiagnosisId
+            && (document.activeElement === remove || document.activeElement === document.body);
           URL.revokeObjectURL(item.url);
-          diagnosisDraftImages[id].splice(index, 1);
           showMessage(document.getElementById(`${id}Error`));
           renderDraftImages(id);
-          document.getElementById(id).focus();
-        }));
+          if (restoreFocus && !diagnosisBusy && !document.getElementById(id).disabled) document.getElementById(id).focus();
+        });
+        remove.setAttribute('aria-label', `移除图片：${item.file.name}`);
+        remove.disabled = diagnosisBusy;
+        figure.append(preview, node('figcaption', `${item.file.name} · ${formatSize(item.file.size)}`), remove);
+        if (!previousUrls.has(item.url)) figure.classList.add('image-enter');
         return figure;
       }));
       if (id === 'answerImages') document.querySelector('#diagnosisAnswer').required = !diagnosisDraftImages[id].length;
@@ -948,12 +965,16 @@
 
     function lockDiagnosis() {
       diagnosisBusy = true;
+      document.querySelector('#newDiagnosisForm').setAttribute('aria-busy', 'true');
+      diagnosisAnswerForm.setAttribute('aria-busy', 'true');
       const controls = [...document.querySelectorAll('#diagnosisView button, #diagnosisView input, #diagnosisView textarea, #diagnosisDialog button, #diagnosisDialog input, #diagnosisDialog textarea, .side-nav button, #logoutButton')];
       const disabled = controls.map(control => control.disabled);
       controls.forEach(control => { control.disabled = true; });
       return () => {
         if (!diagnosisBusy) return;
         diagnosisBusy = false;
+        document.querySelector('#newDiagnosisForm').removeAttribute('aria-busy');
+        diagnosisAnswerForm.removeAttribute('aria-busy');
         controls.forEach((control, index) => { control.disabled = disabled[index]; });
       };
     }
@@ -973,6 +994,11 @@
         img.loading = 'lazy';
         img.addEventListener('error', () => { img.alt = '图片加载失败，请重新打开诊断重试'; });
         link.append(img);
+        link.addEventListener('click', event => {
+          event.preventDefault();
+          previewImage(path, image.name);
+        });
+        link.setAttribute('aria-label', `预览图片：${image.name}`);
         const download = node('a', '下载图片');
         download.href = `${path}?download=1`;
         download.download = image.name;
@@ -991,12 +1017,19 @@
       button.addEventListener('click', () => {
         if (diagnosisBusy) return;
         if (selectedDiagnosisId !== item.id) {
-          clearDiagnosisImages('answerImages');
-          diagnosisAnswerForm.reset();
+          answerDrafts.set(selectedDiagnosisId, {
+            text: document.querySelector('#diagnosisAnswer').value, images: diagnosisDraftImages.answerImages
+          });
+          const draft = answerDrafts.get(item.id);
+          diagnosisDraftImages.answerImages = draft?.images || [];
+          document.querySelector('#diagnosisAnswer').value = draft?.text || '';
+          showMessage(document.querySelector('#answerImagesError'));
+          renderDraftImages('answerImages');
         }
         selectedDiagnosisId = item.id;
         renderDiagnoses();
-        diagnosisWorkspace.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.querySelector('#diagnosisCaseTitle').focus({ preventScroll: true });
+        scrollToElement(diagnosisWorkspace);
       });
       return button;
     }
@@ -1004,6 +1037,7 @@
     function renderDiagnosisWorkspace() {
       const item = selectedDiagnosis();
       diagnosisWorkspace.hidden = !item;
+      document.querySelector('#diagnosisEmpty').hidden = Boolean(item);
       if (!item) {
         document.querySelector('#diagnosisOriginalImages').replaceChildren();
         document.querySelector('#diagnosisInterview').replaceChildren();
@@ -1020,7 +1054,7 @@
       let answerTurn = 0;
       document.querySelector('#diagnosisInterview').replaceChildren(...item.messages.map(message => {
         const bubble = node('div', '', `diagnosis-message${message.role === 'user' ? ' teaching' : ''}`);
-        bubble.append(node('strong', message.role === 'user' ? '教学' : 'AI'), node('span', message.content));
+        bubble.append(node('strong', message.role === 'user' ? '你 · 教学人员' : '乐读 AI · 教学诊断'), node('span', message.content));
         if (message.role === 'user') {
           const images = node('div', '', 'diagnosis-images');
           images.append(...savedDiagnosisImages(item, ++answerTurn));
@@ -1028,6 +1062,12 @@
         }
         return bubble;
       }));
+      const bubbles = document.querySelector('#diagnosisInterview').children;
+      if (renderedDiagnosisId === item.id && item.messages.length > renderedMessageCount) {
+        [...bubbles].slice(renderedMessageCount).forEach(bubble => bubble.classList.add('message-enter'));
+      }
+      renderedDiagnosisId = item.id;
+      renderedMessageCount = item.messages.length;
       diagnosisAnswerForm.hidden = item.status === 'completed';
       diagnosisResult.hidden = item.status !== 'completed';
       if (item.status === 'completed') {
@@ -1350,6 +1390,7 @@
         phoneInput.value = '';
         showMessage(loginMessage);
         await enterApp('');
+        document.querySelector('.side-nav [aria-current="page"]').focus({ preventScroll: true });
       } catch (error) {
         showMessage(loginMessage, error.message || '登录失败。', 'error');
       } finally {
@@ -1367,6 +1408,11 @@
       searches = [];
       diagnoses = [];
       selectedDiagnosisId = '';
+      imagePreviewDialog.close();
+      answerDrafts.forEach((draft, id) => {
+        if (id !== selectedDiagnosisId) draft.images.forEach(image => URL.revokeObjectURL(image.url));
+      });
+      answerDrafts.clear();
       clearDiagnosisImages('caseImages');
       clearDiagnosisImages('answerImages');
       document.querySelector('#newDiagnosisForm').reset();
@@ -1425,10 +1471,7 @@
     });
     document.querySelector('#closeDiagnosisDialog').addEventListener('click', () => diagnosisDialog.close());
     diagnosisDialog.addEventListener('cancel', event => { if (diagnosisBusy) event.preventDefault(); });
-    diagnosisDialog.addEventListener('close', () => {
-      clearDiagnosisImages('caseImages');
-      document.querySelector('#newDiagnosisForm').reset();
-    });
+    // Dismiss keeps the in-memory draft; success and logout clear it.
     document.querySelector('#newDiagnosisForm').addEventListener('submit', async event => {
       event.preventDefault();
       if (diagnosisBusy) return;
@@ -1442,16 +1485,26 @@
       try {
         const data = await (await apiFetch('/api/diagnoses', options)).json();
         unlock();
+        if (selectedDiagnosisId) answerDrafts.set(selectedDiagnosisId, {
+          text: document.querySelector('#diagnosisAnswer').value, images: diagnosisDraftImages.answerImages
+        });
+        diagnosisDraftImages.answerImages = [];
         diagnoses.unshift(data.diagnosis);
         selectedDiagnosisId = data.diagnosis.id;
         form.reset();
+        clearDiagnosisImages('caseImages');
+        if (selectedDiagnosisId) answerDrafts.delete(selectedDiagnosisId);
         clearDiagnosisImages('answerImages');
         diagnosisAnswerForm.reset();
         diagnosisDialog.close();
         renderDiagnoses();
-        diagnosisWorkspace.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        scrollToElement(diagnosisWorkspace);
         (data.diagnosis.status === 'completed' ? diagnosisResult : document.querySelector('#diagnosisAnswer')).focus();
-      } catch (error) { showMessage(document.querySelector('#newDiagnosisMessage'), error.message, 'error'); }
+      } catch (error) {
+        unlock();
+        showMessage(document.querySelector('#newDiagnosisMessage'), error.message, 'error');
+        document.querySelector('#diagnosisPhenomenon').focus();
+      }
       finally { unlock(); }
     });
 
@@ -1469,6 +1522,7 @@
         unlock();
         diagnoses = diagnoses.map(value => value.id === data.diagnosis.id ? data.diagnosis : value);
         answer.value = '';
+        answerDrafts.delete(item.id);
         clearDiagnosisImages('answerImages');
         renderDiagnoses();
         if (data.diagnosis.status === 'completed') {
@@ -1477,7 +1531,7 @@
         } else {
           answer.focus();
         }
-      } catch (error) { showMessage(diagnosisMessage, error.message, 'error'); }
+      } catch (error) { unlock(); showMessage(diagnosisMessage, error.message, 'error'); answer.focus(); }
       finally { unlock(); }
     });
 
@@ -1495,10 +1549,12 @@
     });
 
     document.querySelectorAll('.side-nav button').forEach(button => button.addEventListener('click', async () => {
+      if (diagnosisBusy || button.getAttribute('aria-current') === 'page') return;
       const view = button.dataset.view;
       schoolView.hidden = view !== 'school';
       networkView.hidden = view !== 'network';
       diagnosisView.hidden = view !== 'diagnosis';
+      reveal({ school: schoolView, network: networkView, diagnosis: diagnosisView }[view]);
       const labels = { school: '学校资料', network: '网络资料', diagnosis: '教学诊断' };
       document.querySelector('#pageTitle').textContent = labels[view];
       document.querySelector('.mobile-context').textContent = view === 'school' ? '目标学校A · 学校资料' : labels[view];
@@ -1511,9 +1567,12 @@
         try { await refreshNetwork(); } catch (error) { showMessage(searchMessage, error.message, 'error'); }
       }
       if (view === 'diagnosis') {
-        try { await refreshDiagnoses(); } catch (error) { showMessage(diagnosisMessage, error.message, 'error'); }
+        const message = document.querySelector('#diagnosisLoadMessage');
+        showMessage(message, '正在读取你的诊断…');
+        try { await refreshDiagnoses(); showMessage(message); }
+        catch (error) { showMessage(message, `${error.message} 请刷新页面重试。`, 'error'); }
       }
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: reducedMotion.matches ? 'instant' : 'smooth' });
     }));
 
     undoButton.addEventListener('click', undoLatest);
@@ -1533,7 +1592,7 @@
     apiFetch('/api/auth/me')
       .then(response => response.json())
       .then(data => data.authenticated ? enterApp(data.turnstile_site_key || '') : showLogin())
-      .catch(error => showMessage(loginMessage, error.message || '无法连接资料库。', 'error'));
+      .catch(error => showMessage(appShell.hidden ? loginMessage : profileMessage, error.message || '无法连接资料库，请刷新页面重试。', 'error'));
   </script>
 </body>
 </html>

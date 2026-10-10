@@ -45,6 +45,7 @@ const seededId = seeded.data.diagnosis.id;
 await call(updateDiagnosis, { answer: '集中在八年级一班固定 6 名学生；同期出勤和作业难度没有变化。' }, { method: 'PATCH', id: seededId });
 await call(updateDiagnosis, { answer: '只在班级群统一提醒，没有逐一联系这些学生。' }, { method: 'PATCH', id: seededId });
 let errors = 0;
+let authenticated = true;
 const routes = { '/api/profile': { GET: profile }, '/api/network/binding': { GET: bindingGet, POST: bindingPost },
   '/api/network/accounts': { GET: accounts, POST: add }, '/api/network/searches': { GET: searches, POST: search },
   '/api/diagnoses': { GET: diagnoses, POST: createDiagnosis } };
@@ -53,7 +54,8 @@ createServer(async (incoming, outgoing) => {
   let response;
   if (url.pathname === '/mobile') response = new Response('<iframe title="390px 页面" src="/" style="width:390px;height:844px;border:1px solid #ccc"></iframe>');
   else if (url.pathname === '/favicon.ico') response = new Response(null, { status: 204 });
-  else if (url.pathname === '/' || url.pathname === '/screenshot') {
+  else if (url.pathname === '/' || url.pathname === '/login' || url.pathname === '/screenshot') {
+    authenticated = url.pathname !== '/login';
     const screenshotSetup = url.pathname === '/screenshot' ? `
       window.addEventListener('load', async () => {
         document.getElementById('diagnosisNav').click();
@@ -62,14 +64,21 @@ createServer(async (incoming, outgoing) => {
         document.getElementById('diagnosisWorkspace')?.scrollIntoView({block:'start'});
       });` : '';
     const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8').replace('<script>', `<script>
+      window.turnstile = {
+        render(selector, options) {
+          const button = document.createElement('button'); button.type = 'button'; button.className = 'action-button';
+          button.textContent = '本地合成验证 · 点击继续'; button.addEventListener('click', () => options.callback());
+          document.querySelector(selector).append(button); return selector;
+        }, getResponse() { return 'local-synthetic'; }, reset() {}
+      };
       window.addEventListener('DOMContentLoaded', () => {
         const notice = document.createElement('div');
         notice.textContent = '本地验收：合成数据与模拟 AI，非真实 AI 诊断';
-        notice.style.cssText = 'background:#fff3cd;color:#542c00;padding:8px 12px;margin-bottom:12px;font:14px sans-serif;border:2px solid #9a6700';
+        notice.style.cssText = 'background:#fff8e8;color:#785319;padding:8px 12px;margin-bottom:20px;font:12px sans-serif;border:1px solid #e8d8b5;border-radius:8px';
         document.querySelector('main').prepend(notice);
         for (const id of ['caseImages', 'answerImages']) {
           const button = document.createElement('button');
-          button.type = 'button'; button.textContent = '测试：选择合成图片';
+          button.type = 'button'; button.className = 'action-button'; button.textContent = '测试：选择合成图片';
           button.addEventListener('click', async () => {
             const canvas = document.createElement('canvas'); canvas.width = 480; canvas.height = 240;
             const ctx = canvas.getContext('2d'); ctx.fillStyle = '#fffdf8'; ctx.fillRect(0,0,480,240);
@@ -85,7 +94,7 @@ createServer(async (incoming, outgoing) => {
           });
           document.getElementById(id).after(button);
         }
-        const failButton = document.createElement('button'); failButton.textContent = '测试：下次 AI 失败'; failButton.type = 'button';
+        const failButton = document.createElement('button'); failButton.textContent = '测试：下次 AI 失败'; failButton.type = 'button'; failButton.className = 'action-button';
         failButton.addEventListener('click', () => fetch('/test-ai-failure', {method:'POST'}));
         document.getElementById('diagnosisAnswerForm').append(failButton);
       });
@@ -101,7 +110,8 @@ createServer(async (incoming, outgoing) => {
   } else if (url.pathname === '/test-error') { errors++; response = new Response('ok'); }
   else if (url.pathname === '/test-ai-failure') { failNextAI = true; response = new Response('ok'); }
   else if (url.pathname === '/diagnostics') response = Response.json({ errors });
-  else if (url.pathname === '/api/auth/me') response = Response.json({ authenticated: true, user: { id: 'u0', phone_last4: '1234', note: '测试用户' }, turnstile_site_key: '' });
+  else if (url.pathname === '/api/auth/me') response = Response.json({ authenticated, user: { id: 'u0', phone_last4: '1234', note: '测试用户' }, turnstile_site_key: 'local-preview' });
+  else if (url.pathname === '/api/auth/login' || url.pathname === '/api/auth/logout') { authenticated = url.pathname.endsWith('/login'); response = Response.json({ ok: true }); }
   else if (url.pathname === '/api/documents') response = Response.json({ documents: [], is_admin: false });
   else if (routes[url.pathname]?.[incoming.method] || (incoming.method === 'PATCH' && /^\/api\/diagnoses\/[^/]+$/.test(url.pathname)) || /^\/api\/diagnoses\/[^/]+\/images\/[^/]+$/.test(url.pathname)) {
     const chunks = []; for await (const chunk of incoming) chunks.push(chunk);
