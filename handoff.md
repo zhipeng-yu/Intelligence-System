@@ -2,13 +2,15 @@
 
 更新日期：2026-10-10
 
-2026-10-10 完成 UI 与交互改版，尚未生产部署；生产仍为 `101aa2cf` / 应用源码 `c8016ce` / D1 `0010`。不重建已删除的 school-profile-handoff.md，`.codex-tmp/` 保留。
+2026-10-10 UI 与交互改版经用户明确“部署生产”授权，已发布为 `ca89f43f-ac7d-4cc8-a676-ea5b7df4e9f6` / 应用源码 `ddcc69b` / D1 `0010`。不重建已删除的 school-profile-handoff.md，`.codex-tmp/` 保留。
+
+发布前 main 与 origin/main 一致；只从忽略的隔离目录发布 index.html、路由及正式 Functions，未上传文档、测试、截图或本地模拟服务。首次使用 Functions build 的 outfile 输出遇到 multipart 格式构建错误，未形成新部署；改用隔离目录原生 Functions 自动构建后成功。生产列表确认 Production/main/ddcc69b，正式首页 200 且与源码逐字节一致，匿名诊断及私有图片接口 401，身份接口返回未登录。正式登录页 1280px/390px 无横向溢出，键盘焦点可见，无本站脚本错误；Turnstile iframe 有第三方 NaN 控制台输出，未完成人机验证或登录。未迁移生产 D1、读取/修改 Secret、真实调用 Ark、小红书或改变计划任务。
 
 统一登录、学校资料、网络资料和教学诊断的浅色视觉语言，保留乐读名称、三个一级板块和原业务规则。重点重排聊天阅读层次、附件、输入区和四段结论；增加页内图片放大预览，保留选择/粘贴和仅图片回答。板块、弹窗、消息、图片与按钮采用短时 transform/opacity 动效，支持减少动态效果。新建弹窗关闭、案例和板块切换保留当前页面内存草稿；提交成功清理对应草稿，退出清理全部，刷新不持久化。提交中保持锁定，失败恢复控件并把焦点放回输入；案例切换焦点进入案例标题，原生键盘滚动不加全局平滑延迟。
 
 Node 46 项（新增 3 项交互回归）、Python 18 项、Functions 构建及新的本地 0001～0010 迁移通过。GPT 内置浏览器使用合成身份/资料与模拟 AI，在 1280px/390px 检查登录、主导航、来源展开、网络表单、诊断创建/聊天/结论、原生选择与粘贴图片、仅图片回答、预览/移除/下载、错误保留与重试、草稿及键盘焦点。无横向溢出或意外控制台/脚本错误；故意模拟的 502 仅用于重试验收。减少动态效果有 CSS 与自动检查，其他现代浏览器未逐一实测。
 
-`artifacts/school-archive-desktop.png` 已更新为本轮本地合成案例截图，另有 `artifacts/school-archive-mobile.jpg`。预览服务器 `/login` 提供合成登录/验证，仅用于本地验收。没有真实 Ark、小红书、扫码、计划任务操作，没有迁移生产 D1、修改 Secret 或部署 Pages。
+`artifacts/school-archive-desktop.png` 为本轮本地合成案例截图，另有 `artifacts/school-archive-mobile.jpg`。新增 `artifacts/school-archive-production-login-desktop.jpg` 与 `artifacts/school-archive-production-login-mobile.jpg` 为正式登录页；登录后流程使用此前本地合成数据与模拟 AI 验收，不宣称本轮生产真实 AI 流程通过。预览服务器 `/login` 提供合成登录/验证，仅用于本地验收。
 
 ## 图片功能已发布，真实识图流程已验收
 
@@ -24,7 +26,7 @@ Node 43 项、Python 18 项、Functions 构建与全新本地 0001～0010 迁移
 
 ## 既有生产已发布，待真实使用验收
 
-生产现为 `101aa2cf` / 应用源码 `c8016ce` / D1 `0010`。工作器目录 `D:/Project/ledu_project/Intelligence System` 为当前源码，未跟踪 `.codex-tmp/` 原样保留；`Ledu-Network-Materials-Worker` 仍为 Disabled，等待真实扫码验收后恢复既有每分钟、IgnoreNew 设置。
+生产现为本文开头的 UI 版本，D1 保持 `0010`。工作器目录 `D:/Project/ledu_project/Intelligence System` 为当前源码，未跟踪 `.codex-tmp/` 原样保留；`Ledu-Network-Materials-Worker` 仍为 Disabled，等待真实扫码验收后恢复既有每分钟、IgnoreNew 设置。
 
 教学诊断是第三个登录后一级板块：复用既有 Ark AI，从教学人员已发现的现象出发，一次追问一个尚未回答的关键问题，定位主讲老师具体可改行为，给出解决与验证办法；证据不足须明确说明。生产诊断按会话用户隔离；本轮源码仅为诊断图片新增私有 R2 使用，不连接学校资料或网络资料。
 
