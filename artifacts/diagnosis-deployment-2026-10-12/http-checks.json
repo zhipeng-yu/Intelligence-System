@@ -1,0 +1,25 @@
+[
+  {
+    "path": "/",
+    "status": 200,
+    "source_equal": true,
+    "sha256": "722bbeadb13868ddaf4eaf884a517638f194e9c14110889696b4715aa012ad4b"
+  },
+  {
+    "path": "/api/auth/me",
+    "status": 200,
+    "response": {
+      "authenticated": false,
+      "user": null,
+      "turnstile_site_key": "0x4AAAAAAEa03zyFyftWWJR2"
+    }
+  },
+  {
+    "path": "/api/diagnoses",
+    "status": 401
+  },
+  {
+    "path": "/api/diagnoses/deploy-probe/images/deploy-probe",
+    "status": 401
+  }
+]
