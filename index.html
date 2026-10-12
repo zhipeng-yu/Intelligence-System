@@ -167,8 +167,10 @@
     .diagnosis-image a { display: inline-flex; align-items: center; min-height: 44px; font-size: 12px; }
     .image-preview-button { display: block; width: 100%; padding: 0; background: transparent; border: 0; border-radius: 10px; }
     .diagnosis-result { padding: 24px; background: #f7f8fa; border: 1px solid var(--line); border-radius: 16px; }
-    .diagnosis-result > .eyebrow { color: var(--green); }
+    .diagnosis-jumps { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    #diagnosisResult, #diagnosisAnswerForm { scroll-margin-top: 24px; }
     .diagnosis-result h3 { margin-bottom: 24px; font-size: 23px; }
+    .diagnosis-result > .notice { margin-bottom: 24px; }
     .conclusion-section + .conclusion-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
     .conclusion-section h4 { margin: 0 0 10px; font-size: 14px; font-weight: 650; }
     .conclusion-section h4 span { display: inline-grid; place-items: center; width: 26px; height: 26px; margin-right: 8px; color: var(--red-dark); background: var(--tint); border-radius: 7px; font-size: 12px; }
@@ -258,6 +260,7 @@
       .diagnosis-message.teaching { max-width: 94%; padding: 14px 16px; }
       .diagnosis-original { padding: 16px; font-size: 16px; }
       .diagnosis-result { padding: 18px; }
+      #diagnosisResult, #diagnosisAnswerForm { scroll-margin-top: 0; }
       .diagnosis-result p, .diagnosis-result ul { font-size: 16px; }
       .diagnosis-image { width: 132px; }
       .diagnosis-image img { height: 104px; }
@@ -451,10 +454,19 @@
               <div><span class="eyebrow">案例</span><h2 id="diagnosisCaseTitle" tabindex="-1"></h2></div>
               <span class="status" id="diagnosisCaseStatus"></span>
             </div>
+            <div class="diagnosis-jumps"><button class="action-button" id="diagnosisJumpResult" type="button" hidden>查看分析</button><button class="action-button" id="diagnosisJumpAnswer" type="button">继续回答</button></div>
             <div class="diagnosis-original"><strong>已发现的现象</strong><span id="diagnosisOriginalFact"></span><div class="diagnosis-images" id="diagnosisOriginalImages"></div></div>
             <div class="diagnosis-interview" id="diagnosisInterview" aria-live="polite"></div>
+            <article class="diagnosis-result" id="diagnosisResult" tabindex="-1" hidden>
+              <span class="eyebrow">本轮分析结束</span><h3>当前分析</h3>
+              <p class="notice">请先核对能否定位及判断限制。证据不足时，先核实；表现改善也不等于已确认原因。可在下方质疑依据或补充证据。</p>
+              <section class="conclusion-section"><h4><span aria-hidden="true">01</span>发现的问题</h4><p id="diagnosisProblem"></p></section>
+              <section class="conclusion-section"><h4><span aria-hidden="true">02</span>判断依据</h4><ul id="diagnosisEvidence"></ul></section>
+              <section class="conclusion-section"><h4><span aria-hidden="true">03</span>解决办法</h4><p id="diagnosisSolution"></p></section>
+              <section class="conclusion-section"><h4><span aria-hidden="true">04</span>如何确认有效</h4><p id="diagnosisVerification"></p></section>
+            </article>
             <form class="compact-form diagnosis-answer" id="diagnosisAnswerForm">
-              <div class="form-field"><label for="diagnosisAnswer">补充具体事实</label><textarea id="diagnosisAnswer" maxlength="4000" placeholder="说说当时的场景、老师的动作或你观察到的事实…" required></textarea></div>
+              <div class="form-field"><label id="diagnosisAnswerLabel" for="diagnosisAnswer">补充具体事实</label><textarea id="diagnosisAnswer" maxlength="4000" placeholder="说说当时的场景、老师的动作或你观察到的事实…" required></textarea></div>
               <div class="form-field attachment-field">
                 <label for="answerImages">添加或粘贴图片（可选）</label>
                 <input class="diagnosis-image-input" id="answerImages" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple aria-describedby="answerImagesHint answerImagesError">
@@ -465,13 +477,6 @@
               <p class="notice">请概括事实和证据，不粘贴完整聊天记录，不填写学生姓名、手机号或个人成绩。</p>
               <button class="primary-button" id="sendDiagnosisAnswer" type="submit">回答并继续</button>
             </form>
-            <article class="diagnosis-result" id="diagnosisResult" tabindex="-1" hidden>
-              <span class="eyebrow">DIAGNOSIS COMPLETE</span><h3>诊断结论</h3>
-              <section class="conclusion-section"><h4><span aria-hidden="true">01</span>发现的问题</h4><p id="diagnosisProblem"></p></section>
-              <section class="conclusion-section"><h4><span aria-hidden="true">02</span>判断依据</h4><ul id="diagnosisEvidence"></ul></section>
-              <section class="conclusion-section"><h4><span aria-hidden="true">03</span>解决办法</h4><p id="diagnosisSolution"></p></section>
-              <section class="conclusion-section"><h4><span aria-hidden="true">04</span>如何确认有效</h4><p id="diagnosisVerification"></p></section>
-            </article>
             <p class="notice" id="diagnosisMessage" role="status" aria-live="polite"></p>
           </section>
         </div>
@@ -535,7 +540,7 @@
     let networkBudget = { limit: 180, actual: 0, reserved: 0, remaining: 180 };
     let diagnoses = [];
     let selectedDiagnosisId = '';
-    const DIAGNOSIS_STATUS_LABELS = { active: 'AI 诊断中', completed: '诊断完成' };
+    const DIAGNOSIS_STATUS_LABELS = { active: 'AI 诊断中', completed: '本轮分析结束' };
 
     try {
       adminKey = urlKey || localStorage.getItem(STORAGE_KEY) || '';
@@ -926,11 +931,14 @@
     }
 
     function addDiagnosisImages(id, files) {
-      if (diagnosisBusy) return;
-      if (id === 'answerImages' && selectedDiagnosis()?.status !== 'active') return;
+      if (diagnosisBusy || !files.length) return;
+      if (id === 'answerImages' && !selectedDiagnosis()) return;
       const savedCount = id === 'answerImages' ? (selectedDiagnosis()?.images || []).length : 0;
       let error = '';
-      if (savedCount + diagnosisDraftImages[id].length + files.length > 3) error = '每次诊断累计最多 3 张图片，请先移除待提交图片。';
+      if (savedCount >= 3) error = '本案例已保存 3 张图片，不能再添加；请用文字补充。';
+      else if (savedCount + diagnosisDraftImages[id].length + files.length > 3) error = diagnosisDraftImages[id].length
+        ? `还可提交 ${3 - savedCount} 张图片，请移除部分待提交图片或减少本次选择。`
+        : `本案例还可添加 ${3 - savedCount} 张图片，请减少本次选择。`;
       else if (files.some(file => !file.size || file.size > 5 * 1024 * 1024)) error = '请选择非空图片，每张不能超过 5MB。';
       else if (files.some(file => !/\.(jpe?g|png|webp)$/i.test(file.name) || !['image/jpeg', 'image/png', 'image/webp'].includes(file.type))) error = '请选择 JPG、PNG 或 WebP 图片。';
       showMessage(document.getElementById(`${id}Error`), error, error ? 'error' : '');
@@ -962,6 +970,17 @@
       diagnosisDraftImages[id].forEach(item => body.append('images', item.file));
       return { method, body };
     }
+
+    document.querySelector('#diagnosisJumpResult').addEventListener('click', () => {
+      if (diagnosisBusy) return;
+      diagnosisResult.focus({ preventScroll: true });
+      scrollToElement(diagnosisResult);
+    });
+    document.querySelector('#diagnosisJumpAnswer').addEventListener('click', () => {
+      if (diagnosisBusy) return;
+      document.querySelector('#diagnosisAnswer').focus({ preventScroll: true });
+      scrollToElement(diagnosisAnswerForm);
+    });
 
     function lockDiagnosis() {
       diagnosisBusy = true;
@@ -1045,11 +1064,13 @@
       }
       document.querySelector('#diagnosisCaseTitle').textContent = item.name;
       document.querySelector('#diagnosisCaseStatus').textContent = DIAGNOSIS_STATUS_LABELS[item.status];
-      document.querySelector('#diagnosisCaseStatus').className = `status ${item.status === 'completed' ? 'completed' : 'processing'}`;
+      document.querySelector('#diagnosisCaseStatus').className = `status${item.status === 'completed' ? '' : ' processing'}`;
       document.querySelector('#diagnosisOriginalFact').textContent = item.phenomenon;
       document.querySelector('#diagnosisOriginalImages').replaceChildren(...savedDiagnosisImages(item, 0));
       document.querySelector('#answerImages').disabled = (item.images || []).length >= 3;
-      document.querySelector('#answerImagesHint').textContent = `可在回答框直接粘贴图片，还可添加 ${3 - (item.images || []).length} 张。JPG、PNG、WebP，每张不超过 5MB。图片仅你可查看，并交给 AI 辅助分析；请先遮挡个人信息。`;
+      document.querySelector('#answerImagesHint').textContent = (item.images || []).length >= 3
+        ? '本案例已保存 3 张图片，不能再添加；可用文字补充。'
+        : `可在回答框直接粘贴图片，还可添加 ${3 - (item.images || []).length} 张。JPG、PNG、WebP，每张不超过 5MB。图片仅你可查看，并交给 AI 辅助分析；请先遮挡个人信息。`;
       showMessage(diagnosisMessage);
       let answerTurn = 0;
       document.querySelector('#diagnosisInterview').replaceChildren(...item.messages.map(message => {
@@ -1068,8 +1089,15 @@
       }
       renderedDiagnosisId = item.id;
       renderedMessageCount = item.messages.length;
-      diagnosisAnswerForm.hidden = item.status === 'completed';
+      diagnosisAnswerForm.hidden = false;
       diagnosisResult.hidden = item.status !== 'completed';
+      document.querySelector('#diagnosisJumpResult').hidden = item.status !== 'completed';
+      document.querySelector('#diagnosisJumpAnswer').textContent = item.status === 'completed' ? '质疑或补充' : '继续回答';
+      document.querySelector('#diagnosisAnswerLabel').textContent = item.status === 'completed' ? '质疑分析或补充证据' : '补充具体事实';
+      document.querySelector('#diagnosisAnswer').placeholder = item.status === 'completed'
+        ? '例如：这个依据不足；还有一个反例；明天的步骤或验证办法请再具体些…'
+        : '说说当时的场景、老师的动作或你观察到的事实…';
+      document.querySelector('#sendDiagnosisAnswer').textContent = item.status === 'completed' ? '补充并更新分析' : '回答并继续';
       if (item.status === 'completed') {
         document.querySelector('#diagnosisProblem').textContent = item.problem;
         document.querySelector('#diagnosisEvidence').replaceChildren(...item.evidence.map(value => node('li', value)));
@@ -1516,7 +1544,9 @@
       const answer = document.querySelector('#diagnosisAnswer');
       const options = diagnosisRequest('PATCH', { answer: answer.value }, 'answerImages');
       const unlock = lockDiagnosis();
-      showMessage(diagnosisMessage, 'AI 正在分析文字和图片，并决定下一问…');
+      showMessage(diagnosisMessage, item.status === 'completed'
+        ? 'AI 正在核对补充的文字和图片，更新本轮分析…'
+        : 'AI 正在分析文字和图片，并决定下一问…');
       try {
         const data = await (await apiFetch(`/api/diagnoses/${encodeURIComponent(item.id)}`, options)).json();
         unlock();
@@ -1526,7 +1556,7 @@
         clearDiagnosisImages('answerImages');
         renderDiagnoses();
         if (data.diagnosis.status === 'completed') {
-          showMessage(diagnosisMessage, '诊断已完成。', 'success');
+          showMessage(diagnosisMessage, '本轮分析已更新，请核对依据和限制；仍可继续质疑或补充。');
           diagnosisResult.focus();
         } else {
           answer.focus();

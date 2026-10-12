@@ -1,0 +1,54 @@
+{
+  "desktopJump": {
+    "focus": "diagnosisResult",
+    "formVisible": true,
+    "overflow": false,
+    "resultY": 48.125,
+    "width": 1280
+  },
+  "followupFailure": {
+    "answerEnabled": true,
+    "focus": "diagnosisAnswer",
+    "images": 1,
+    "problem": "尚不能定位：补充的反例需要核实"
+  },
+  "previewReturn": "预览图片：clipboard.png",
+  "mobileQuota": {
+    "answerY": 400.359375,
+    "focus": "diagnosisAnswer",
+    "overflow": false,
+    "pendingImages": 0,
+    "status": "本轮分析结束",
+    "statusClass": "status",
+    "storedImages": 3,
+    "width": 390
+  },
+  "mobileJump": {
+    "focus": "diagnosisResult",
+    "margin": "0px",
+    "navBottom": 69,
+    "overflow": false,
+    "resultY": 93.296875,
+    "width": 390
+  },
+  "repeatFailure": {
+    "draft": "为什么问？我已说明了人数，这是老师无提示让学生自己写的题。",
+    "focus": "diagnosisAnswer",
+    "message": "AI 的下一问重复了，本次回答尚未保存；内容已保留，请重试。"
+  },
+  "refresh": {
+    "followupPresent": true,
+    "formVisible": true,
+    "images": 1,
+    "overflow": false
+  },
+  "console": {
+    "intentionalFailures": 2,
+    "entries": []
+  },
+  "dialogDraft": {
+    "focus": "diagnosisName",
+    "name": "明天课前核对",
+    "text": "这是未提交草稿。"
+  }
+}

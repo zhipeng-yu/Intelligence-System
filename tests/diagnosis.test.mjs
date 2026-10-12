@@ -85,7 +85,7 @@ test('AI follows a reported phenomenon to a teacher action and a verifiable solu
   useAI(env, [
     question('未提交学生是否集中在固定学生？'),
     question('老师对这些未交学生采取了哪些提醒方式？'),
-    complete
+    complete, { ...complete, solution: '明天先核对提醒是否收到，再确定跟进办法。' }
   ], requests);
   const created = await create(call);
   const id = created.data.diagnosis.id;
@@ -113,8 +113,13 @@ test('AI follows a reported phenomenon to a teacher action and a verifiable solu
   assert.match(requests[2].body.input, /集中在固定 6 名学生/);
   assert.equal(requests[2].body.tools[0].name, 'continue_teaching_diagnosis');
 
-  const locked = await call(onRequestPatch, { answer: '继续' }, { user: 0, method: 'PATCH', id });
-  assert.equal(locked.status, 409);
+  const clarified = await call(onRequestPatch, { answer: '凭什么判断？明天先做什么？' }, { user: 0, method: 'PATCH', id });
+  assert.equal(clarified.status, 200);
+  assert.match(clarified.data.diagnosis.solution, /明天先核对/);
+  assert.equal(clarified.data.diagnosis.turn_count, 2);
+  assert.equal(clarified.data.diagnosis.messages.at(-1).content, '凭什么判断？明天先做什么？');
+  assert.match(requests[3].body.input, /previous_conclusion/);
+  assert.match(requests[3].body.input, /本周逐一联系固定未交学生/);
 });
 
 test('repeated AI question fails without saving the answer', async t => {
@@ -124,6 +129,7 @@ test('repeated AI question fails without saving the answer', async t => {
   const id = (await create(call)).data.diagnosis.id;
   const result = await call(onRequestPatch, { answer: '只在群里发消息。' }, { user: 0, method: 'PATCH', id });
   assert.equal(result.status, 502);
+  assert.match(result.data.error, /下一问重复/);
   assert.equal(errorLog.mock.callCount(), 1);
   const saved = (await call(onRequestGet, undefined, { user: 0, method: 'GET' })).data.diagnoses[0];
   assert.equal(saved.turn_count, 0);
@@ -190,7 +196,7 @@ test('AI output and 0009 migration reject invalid diagnosis state', async t => {
 test('case and answer images go to Ark, persist privately, and keep their turn on later answers', async t => {
   const { call, env } = await fixture(t, false, false);
   const objects = useBucket(env), requests = [];
-  useAI(env, [question('老师做了什么？'), question('后来有什么变化？'), complete], requests);
+  useAI(env, [question('老师做了什么？'), question('后来有什么变化？'), complete, complete], requests);
   const created = await imageRequest(env, { fields: { user_id: 'u1' } });
   assert.equal(created.status, 201);
   const first = (await created.json()).diagnosis;
@@ -210,7 +216,11 @@ test('case and answer images go to Ark, persist privately, and keep their turn o
   const finished = await call(onRequestPatch, { answer: '稍后确认了提醒效果。' }, { method: 'PATCH', id: first.id });
   assert.equal(finished.status, 200);
   assert.equal(requests[2].body.input[0].content.filter(part => part.type === 'input_image').length, 2);
-  assert.equal((await imageRequest(env, { id: first.id })).status, 409);
+  const followup = (await (await imageRequest(env, { id: first.id, fields: { answer: '' } })).json()).diagnosis;
+  assert.equal(followup.status, 'completed');
+  assert.deepEqual(followup.images.map(image => image.turn), [0, 1, 3]);
+  assert.equal(followup.turn_count, 2);
+  assert.equal(requests[3].body.input[0].content.filter(part => part.type === 'input_image').length, 3);
   const image = await imageDownload(env, first.id, first.images[0].id);
   assert.equal(image.status, 200);
   assert.deepEqual(Buffer.from(await image.arrayBuffer()), pngBytes);
@@ -309,4 +319,57 @@ test('partial R2 writes, D1 failures and revision conflicts remove only newly at
   const saved = (await call(onRequestGet, undefined, { method: 'GET' })).data.diagnoses[0];
   assert.equal(saved.turn_count, 0);
   assert.equal(saved.images.length, 1);
+});
+
+test('completed follow-ups at the interview limit update only on success and keep ownership, images and revision protection', async t => {
+  t.mock.method(console, 'error', () => {});
+  const { call, env, db } = await fixture(t, false, false);
+  const objects = useBucket(env);
+  useAI(env, [complete]);
+  const first = (await (await imageRequest(env)).json()).diagnosis;
+  db.sql.prepare('UPDATE teaching_diagnoses SET turn_count = 12 WHERE id = ?').run(first.id);
+  const oldKeys = [...objects.keys()];
+  const requests = [];
+  useAI(env, [question('新问题？')], requests);
+  assert.equal((await imageRequest(env, { id: first.id, user: 1 })).status, 404);
+  assert.equal(requests.length, 0);
+  assert.equal((await imageRequest(env, { id: first.id })).status, 502);
+  assert.deepEqual([...objects.keys()], oldKeys);
+  let saved = (await call(onRequestGet, undefined, { method: 'GET' })).data.diagnoses[0];
+  assert.equal(saved.problem, first.problem);
+  assert.equal(saved.messages.length, 0);
+  assert.equal(saved.turn_count, 12);
+
+  env.ARK_FETCH = async () => {
+    db.sql.prepare('UPDATE teaching_diagnoses SET revision = revision + 1 WHERE id = ?').run(first.id);
+    return arkResponse(complete);
+  };
+  assert.equal((await imageRequest(env, { id: first.id })).status, 409);
+  assert.deepEqual([...objects.keys()], oldKeys);
+  useAI(env, [{ ...complete, problem: '尚不能定位：新反例削弱了原判断' }, complete]);
+  saved = (await (await imageRequest(env, { id: first.id, fields: { answer: '这里还有反例。' } })).json()).diagnosis;
+  assert.equal(saved.status, 'completed');
+  assert.match(saved.problem, /新反例/);
+  assert.equal(saved.turn_count, 12);
+  assert.deepEqual(saved.images.map(image => image.turn), [0, 1]);
+  saved = (await call(onRequestPatch, { answer: '明天具体做什么？' }, { method: 'PATCH', id: first.id })).data.diagnosis;
+  assert.equal(saved.messages.length, 2);
+  assert.equal(saved.turn_count, 12);
+});
+
+test('follow-up storage overflow fails before AI and leaves the previous analysis intact', async t => {
+  const { call, env, db } = await fixture(t, false, false);
+  useAI(env, [complete]);
+  const first = (await create(call)).data.diagnosis;
+  const history = Array.from({ length: 14 }, () => ({ role: 'user', content: '答'.repeat(4000) }));
+  db.sql.prepare('UPDATE teaching_diagnoses SET messages_json = ? WHERE id = ?').run(JSON.stringify(history), first.id);
+  let called = false;
+  env.ARK_FETCH = async () => { called = true; return arkResponse(complete); };
+  const failed = await call(onRequestPatch, { answer: '补'.repeat(4000) }, { method: 'PATCH', id: first.id });
+  assert.equal(failed.status, 400);
+  assert.match(failed.data.error, /保存上限/);
+  assert.equal(called, false);
+  const saved = (await call(onRequestGet, undefined, { method: 'GET' })).data.diagnoses[0];
+  assert.equal(saved.problem, first.problem);
+  assert.deepEqual(saved.messages, history);
 });

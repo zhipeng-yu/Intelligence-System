@@ -19,6 +19,7 @@ env.BUCKET = {
   async delete(key) { imageObjects.delete(key); }
 };
 let failNextAI = false;
+let repeatNextAI = false;
 const aiTurns = [
   { status: 'question', question: '这几名未交学生是否一直是同一批？', problem: '', evidence: [], solution: '', verification: '' },
   { status: 'question', question: '老师对这些固定未交学生具体做过什么？', problem: '', evidence: [], solution: '', verification: '' },
@@ -28,12 +29,28 @@ const aiTurns = [
     verification: '下两讲核对这 6 名学生的提交情况，并确认家长是否收到跟进。' },
   { status: 'question', question: '请举一条反馈，老师写出了孩子的哪些具体表现？', problem: '', evidence: [], solution: '', verification: '' }
 ];
+const baseConclusion = aiTurns.find(turn => turn.status === 'complete');
 env.ARK_API_KEY = 'local-synthetic-key';
-env.ARK_FETCH = async () => {
+env.ARK_FETCH = async (url, options) => {
   if (failNextAI) { failNextAI = false; return new Response('Simulated failure', { status: 503 }); }
-  const value = aiTurns.shift() || {
-    status: 'question', question: '当时老师具体采取了什么动作？', problem: '', evidence: [], solution: '', verification: ''
-  };
+  const input = JSON.parse(options.body).input;
+  const prompt = typeof input === 'string' ? input : input[0].content[0].text;
+  const data = JSON.parse(prompt.slice(prompt.lastIndexOf('\n\n') + 2));
+  const question = text => ({ status: 'question', question: text, problem: '', evidence: [], solution: '', verification: '' });
+  const conclusion = { ...baseConclusion, problem: '已能定位的可改行为：未核实原出错学生在无提示新题上的表现',
+    evidence: ['这是本地模拟输出，仅用于验证更新与保存界面，不评价真实教学质量'],
+    solution: '明天让原出错学生无提示独立做同类新题，检查完整过程；缺少原题时先核对题型。',
+    verification: '记录原错误是否减少，下一讲用同类新题复查；改善只支持初步改善，不能确认原因。' };
+  let value;
+  if (data.name === '王老师作业跟进' && !data.previous_conclusion) value = aiTurns.shift();
+  else if (repeatNextAI) { repeatNextAI = false; value = question(data.interview.find(item => item.role === 'assistant')?.content || '请补充事实。'); }
+  else if (data.previous_conclusion) value = { ...conclusion,
+    problem: data.interview.at(-1)?.content.includes('反例') ? '尚不能定位：补充的反例需要核实' : conclusion.problem,
+    solution: '补充后已更新：' + conclusion.solution };
+  else if (data.name.includes('证据不足')) value = { ...conclusion, problem: '尚不能定位：只有主观感受，缺少具体观察', solution: '先收集一次独立任务的过程和提示条件。' };
+  else if (data.name.includes('长案例') && !data.final_turn) value = question(`第${data.answers_received + 1}问：为了区分观察条件，请补充本轮具体事实。`);
+  else if (data.answers_received >= 2) value = conclusion;
+  else value = question(data.answers_received === 0 ? '为区分主观感觉与实际表现，请举一次具体课堂任务。' : '为核实是否有提示，那次任务是在什么条件下完成的？');
   return Response.json({ output: [{
     type: 'function_call', name: 'continue_teaching_diagnosis', arguments: JSON.stringify(value)
   }] });
@@ -44,6 +61,8 @@ const seeded = await call(createDiagnosis, {
 const seededId = seeded.data.diagnosis.id;
 await call(updateDiagnosis, { answer: '集中在八年级一班固定 6 名学生；同期出勤和作业难度没有变化。' }, { method: 'PATCH', id: seededId });
 await call(updateDiagnosis, { answer: '只在班级群统一提醒，没有逐一联系这些学生。' }, { method: 'PATCH', id: seededId });
+const longCase = (await call(createDiagnosis, { name: '合成长案例（12轮）', phenomenon: '本地跳转验收用合成案例。' })).data.diagnosis;
+for (let index = 0; index < 12; index++) await call(updateDiagnosis, { answer: `第${index + 1}次补充的合成记录：` + '记录当时的任务、提示条件和独立表现，不涉及真实学生。'.repeat(12) }, { method: 'PATCH', id: longCase.id });
 let errors = 0;
 let authenticated = true;
 const routes = { '/api/profile': { GET: profile }, '/api/network/binding': { GET: bindingGet, POST: bindingPost },
@@ -60,7 +79,7 @@ createServer(async (incoming, outgoing) => {
       window.addEventListener('load', async () => {
         document.getElementById('diagnosisNav').click();
         for (let count = 0; count < 20 && !document.querySelector('#diagnosisList .diagnosis-case'); count++) await new Promise(resolve => setTimeout(resolve, 50));
-        [...document.querySelectorAll('#diagnosisList .diagnosis-case')].find(button => button.textContent.includes('诊断完成'))?.click();
+        [...document.querySelectorAll('#diagnosisList .diagnosis-case')].find(button => button.textContent.includes('本轮分析结束'))?.click();
         document.getElementById('diagnosisWorkspace')?.scrollIntoView({block:'start'});
       });` : '';
     const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8').replace('<script>', `<script>
@@ -97,6 +116,9 @@ createServer(async (incoming, outgoing) => {
         const failButton = document.createElement('button'); failButton.textContent = '测试：下次 AI 失败'; failButton.type = 'button'; failButton.className = 'action-button';
         failButton.addEventListener('click', () => fetch('/test-ai-failure', {method:'POST'}));
         document.getElementById('diagnosisAnswerForm').append(failButton);
+        const repeatButton = document.createElement('button'); repeatButton.textContent = '测试：下一问重复'; repeatButton.type = 'button'; repeatButton.className = 'action-button';
+        repeatButton.addEventListener('click', () => fetch('/test-ai-repeat', {method:'POST'}));
+        document.getElementById('diagnosisAnswerForm').append(repeatButton);
       });
       window.addEventListener('error', () => fetch('/test-error', {method:'POST'}));
       window.addEventListener('unhandledrejection', () => fetch('/test-error', {method:'POST'}));
@@ -109,6 +131,7 @@ createServer(async (incoming, outgoing) => {
     response = new Response(html, { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
   } else if (url.pathname === '/test-error') { errors++; response = new Response('ok'); }
   else if (url.pathname === '/test-ai-failure') { failNextAI = true; response = new Response('ok'); }
+  else if (url.pathname === '/test-ai-repeat') { repeatNextAI = true; response = new Response('ok'); }
   else if (url.pathname === '/diagnostics') response = Response.json({ errors });
   else if (url.pathname === '/api/auth/me') response = Response.json({ authenticated, user: { id: 'u0', phone_last4: '1234', note: '测试用户' }, turnstile_site_key: 'local-preview' });
   else if (url.pathname === '/api/auth/login' || url.pathname === '/api/auth/logout') { authenticated = url.pathname.endsWith('/login'); response = Response.json({ ok: true }); }

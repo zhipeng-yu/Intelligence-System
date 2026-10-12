@@ -18,11 +18,13 @@ export const onRequestPatch = withUser(async ({ request, env, user, params }) =>
     WHERE user_id = ?1 AND id = ?2
   `).bind(user.id, params.id).first();
   if (!row) return json({ error: '教学诊断不存在。' }, 404);
-  if (row.status === 'completed') return json({ error: '这次教学诊断已经结束。' }, 409);
-  if (row.turn_count >= 12) return json({ error: '这次教学诊断已达到回答上限，请重新开始。' }, 409);
+  const followup = row.status === 'completed';
+  if (!followup && row.turn_count >= 12) return json({ error: '初次访谈已达到回答上限，请刷新查看分析。' }, 409);
 
   const existing = diagnosisImages(row);
-  const parsed = await readDiagnosisRequest(request, existing, row.turn_count + 1);
+  const history = parseMessages(row.messages_json);
+  const answerTurn = history.filter(message => message.role === 'user').length + 1;
+  const parsed = await readDiagnosisRequest(request, existing, answerTurn);
   if (parsed.error) return parsed.error;
   const { body, uploads } = parsed;
   const answer = parseDiagnosisAnswer(body) || (uploads.length &&
@@ -30,15 +32,20 @@ export const onRequestPatch = withUser(async ({ request, env, user, params }) =>
   if (!answer) return json({ error: '请填写有效的回答。' }, 400);
   if ((existing.length || uploads.length) && !env.BUCKET) return json({ error: '图片存储尚未配置完成。' }, 503);
 
-  const messages = [...parseMessages(row.messages_json), { role: 'user', content: answer }];
+  const messages = [...history, { role: 'user', content: answer }];
+  // Keep the existing storage bound; follow-ups do not restart or consume the initial interview's 12 turns.
+  if (JSON.stringify(messages).length > 60000) return json({ error: '本案例已达到内容保存上限，请新建案例并概括相关事实。本次补充尚未保存。' }, 400);
+  const turnCount = row.turn_count + (followup ? 0 : 1);
   let turn;
   try {
-    turn = await runDiagnosisAI(env, row, messages, row.turn_count + 1, await imageInput(env, existing, uploads));
-  } catch {
+    turn = await runDiagnosisAI(env, row, messages, turnCount, await imageInput(env, existing, uploads));
+  } catch (error) {
     console.error('Teaching diagnosis AI failed');
+    if (error?.code === 'DIAGNOSIS_REPEATED_QUESTION') return json({ error: 'AI 的下一问重复了，本次回答尚未保存；内容已保留，请重试。' }, 502);
     return json({ error: 'AI 教学诊断暂时不可用，本次回答尚未保存，请稍后重试。' }, 502);
   }
   if (turn.status === 'question') messages.push({ role: 'assistant', content: turn.question });
+  if (JSON.stringify(messages).length > 60000) return json({ error: '本案例已达到内容保存上限，本次回答尚未保存；请新建案例并概括相关事实。' }, 400);
   const now = new Date().toISOString();
   const completed = turn.status === 'complete';
   let result;
@@ -46,15 +53,15 @@ export const onRequestPatch = withUser(async ({ request, env, user, params }) =>
     await saveImages(env, uploads);
     result = await env.DB.prepare(`
       UPDATE teaching_diagnoses
-      SET messages_json = ?1, turn_count = turn_count + 1, revision = revision + 1,
+      SET messages_json = ?1, turn_count = ?13, revision = revision + 1,
         status = ?2, problem = ?3, evidence_json = ?4, solution = ?5, verification = ?6,
         updated_at = ?7, completed_at = ?8, images_json = ?12
-      WHERE user_id = ?9 AND id = ?10 AND status = 'active' AND revision = ?11
+      WHERE user_id = ?9 AND id = ?10 AND revision = ?11
     `).bind(
       JSON.stringify(messages), completed ? 'completed' : 'active', completed ? turn.problem : '',
       JSON.stringify(completed ? turn.evidence : []), completed ? turn.solution : '',
       completed ? turn.verification : '', now, completed ? now : null, user.id, params.id, row.revision,
-      JSON.stringify([...existing, ...uploads.map(upload => upload.image)])
+      JSON.stringify([...existing, ...uploads.map(upload => upload.image)]), turnCount
     ).run();
   } catch {
     await discardImages(env, uploads);
