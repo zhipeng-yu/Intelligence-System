@@ -1,0 +1,24 @@
+{
+  "production": "https://ledu-school-archive.pages.dev",
+  "cases": 3,
+  "realResponses": 10,
+  "syntheticOnly": true,
+  "mobileEvidence": {
+    "answerHidden": true,
+    "caseY": 233.265625,
+    "focus": "diagnosisCaseTitle",
+    "resultY": 1605.78125,
+    "scrollWidth": 375,
+    "width": 390
+  },
+  "downloadMatchesSource": true,
+  "previewEscapeFocus": {
+    "id": "",
+    "text": "预览图片：clipboard.png"
+  },
+  "logs": {
+    "applicationWarningsErrors": 0,
+    "thirdParty": "Turnstile iframe: NaN",
+    "thirdPartyEntries": 16
+  }
+}
