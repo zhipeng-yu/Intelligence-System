@@ -1,0 +1,64 @@
+{
+  "scope": "localhost synthetic identities and scripted ARK_FETCH; no real Ark",
+  "longCase": {
+    "width": 390,
+    "height": 844,
+    "turns": 12,
+    "resultDistanceFromWorkspace": 5125.234375
+  },
+  "keyboard": {
+    "outline": "rgb(23, 105, 194) solid 3px",
+    "escapeReturnsToImage": true,
+    "dialogDraftRetained": true
+  },
+  "scenarios": [
+    "vague",
+    "student-blame",
+    "semantic-repeat",
+    "exact-repeat-error-retry",
+    "contradictions-counterexample",
+    "image-text-conflict",
+    "image-only",
+    "post-conclusion-challenge-blocked",
+    "12-turn-limit"
+  ],
+  "console": [],
+  "roundEvidence": [
+    {
+      "focus": "diagnosisAnswer",
+      "lastQuestion": "乐读 AI · 教学诊断第2问：请补充这次课堂第2个可核对的具体环节。",
+      "overflow": false,
+      "questions": 3
+    },
+    {
+      "focus": "diagnosisAnswer",
+      "lastQuestion": "乐读 AI · 教学诊断第3问：请补充这次课堂第3个可核对的具体环节。",
+      "overflow": false,
+      "questions": 5
+    },
+    {
+      "focus": "diagnosisAnswer",
+      "lastQuestion": "乐读 AI · 教学诊断第4问：请补充这次课堂第4个可核对的具体环节。",
+      "overflow": false,
+      "questions": 7
+    },
+    {
+      "focus": "diagnosisAnswer",
+      "lastQuestion": "乐读 AI · 教学诊断第5问：请补充这次课堂第5个可核对的具体环节。",
+      "overflow": false,
+      "questions": 9
+    },
+    {
+      "focus": "diagnosisAnswer",
+      "lastQuestion": "乐读 AI · 教学诊断第6问：请补充这次课堂第6个可核对的具体环节。",
+      "overflow": false,
+      "questions": 11
+    },
+    {
+      "focus": "diagnosisAnswer",
+      "lastQuestion": "乐读 AI · 教学诊断第7问：请补充这次课堂第7个可核对的具体环节。",
+      "overflow": false,
+      "questions": 13
+    }
+  ]
+}
