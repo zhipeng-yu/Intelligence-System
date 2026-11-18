@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 function uiFunction(name, context) {
-  const start = html.indexOf(`    function ${name}(`);
+  const start = html.search(new RegExp(`    (?:async )?function ${name}\\(`));
   assert.notEqual(start, -1);
   const end = start + html.slice(start).search(/\n    (?:(?:async )?function |const |let |document\.|Object\.)/);
   runInNewContext(html.slice(start, end), context);
@@ -38,6 +38,29 @@ test('case changes restore each in-memory text and image draft and move focus to
   context.diagnosisBusy = true;
   button({ id: 'second', name: 'Second', status: 'active' }).click();
   assert.equal(context.selectedDiagnosisId, 'first');
+});
+
+test('binding terminal states revoke the displayed image and key; halted queues stop polling', async () => {
+  for (const [status, halted] of [['ready', false], ['expired', false], ['blocked', false], ['waiting', true], ['queued', true], ['ready', true], ['expired', true]]) {
+    const image = { hidden: false, removeAttribute() { this.removed = true; } };
+    const label = { textContent: '' };
+    const revoked = [];
+    const context = {
+      bindingRequest: 'synthetic', bindingKey: {}, bindingImage: 'blob:synthetic',
+      bindingImageRequest: 'synthetic', bindingExpiry: 1, bindingTimer: 2,
+      apiFetch: async () => ({ json: async () => ({ halted, binding: { status, request_id: 'synthetic' } }) }),
+      document: { querySelector: selector => selector === '#bindingQr' ? image : label },
+      URL: { revokeObjectURL: value => revoked.push(value) },
+      clearTimeout() {}, setTimeout() { assert.fail('Terminal state must stop polling'); }
+    };
+    uiFunction('clearBindingImage', context);
+    await uiFunction('refreshBinding', context)();
+    assert.equal(image.hidden, true);
+    assert.equal(image.removed, true);
+    assert.equal(context.bindingKey, null);
+    assert.deepEqual(revoked, ['blob:synthetic']);
+    if (halted || status === 'blocked') assert.match(label.textContent, /勿反复扫码/);
+  }
 });
 
 test('AI submission locks navigation and inputs, then restores their prior disabled states', () => {

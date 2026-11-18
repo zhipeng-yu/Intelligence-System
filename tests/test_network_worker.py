@@ -323,18 +323,37 @@ class NetworkWorkerTest(unittest.TestCase):
                         network_worker.profile_path(value)
 
     def test_binding_ready_expired_and_security_close_before_reporting(self):
-        for expected in ("ready", "expired", "blocked"):
+        for scenario, expected in (("ready", "ready"), ("navigation", "ready"),
+                                   ("scanned_only", "expired"), ("expired_on_site", "expired"),
+                                   ("blocked", "blocked"), ("refused", "blocked"),
+                                   ("cancelled", "invalid"), ("close_failure", "blocked")):
             client = MagicMock()
-            client._check_captcha.return_value = expected == "blocked"
+            client.page.url = "https://www.xiaohongshu.com/explore"
+            client.access_refused = scenario == "refused"
+            client._check_captcha.return_value = scenario == "blocked"
             client.page.get_by_text.return_value.first.is_visible.return_value = False
-            client.page.locator.return_value.first.screenshot.return_value = b"synthetic PNG"
+            client.page.evaluate.return_value = scenario in ("ready", "navigation", "close_failure")
+            client.page.locator.return_value.filter.return_value.count.return_value = 0
+            qr = client.page.locator.return_value.filter.return_value.first
+            qr.is_visible.return_value = False
+            qr.screenshot.return_value = b"synthetic PNG"
             login = MagicMock()
-            login.return_value.check_login_status.return_value = (True, None)
+            login.return_value.check_login_status.return_value = (False, None)
+            if scenario == "navigation":
+                login.return_value.check_login_status.side_effect = [
+                    RuntimeError("Execution context was destroyed during navigation"), (True, None)]
+            dialog = client.page.locator.return_value
+            dialog.get_by_text.return_value.first.is_visible.return_value = scenario == "expired_on_site"
+            ticks = [0, 1, 2, 121]
             events = []
-            client.close.side_effect = lambda: events.append("close")
+            def close():
+                events.append("close")
+                if scenario == "close_failure":
+                    raise RuntimeError("synthetic close failure")
+            client.close.side_effect = close
             def api(_path, _key, payload):
-                events.append(payload.get("status", "heartbeat"))
-                return {"current": True}
+                events.append("revoke" if payload.get("status") == "blocked" and payload.get("heartbeat") else payload.get("status", "heartbeat"))
+                return {"current": not (scenario == "cancelled" and payload.get("heartbeat"))}
             job = {"profile_id": "00000000-0000-4000-8000-000000000001", "claim_token": "test", "status": "queued"}
             with tempfile.TemporaryDirectory() as directory, \
                     patch.object(network_worker, "PROFILES_PATH", Path(directory)), \
@@ -342,11 +361,126 @@ class NetworkWorkerTest(unittest.TestCase):
                     patch.object(network_worker, "api_request", side_effect=api), \
                     patch.object(network_worker, "read_state", return_value={}), \
                     patch.object(network_worker, "halt_worker") as halt, \
-                    patch.object(network_worker.time, "monotonic", side_effect=[0, 121 if expected == "expired" else 1]):
+                    patch.object(network_worker.time, "monotonic", side_effect=ticks):
                 self.assertEqual(network_worker.process_binding(job, "test"), expected != "blocked")
                 self.assertEqual(events[-2:], ["close", expected])
                 self.assertEqual(halt.called, expected == "blocked")
+                if scenario in ("refused", "blocked"):
+                    self.assertLess(events.index("revoke"), events.index("close"))
+                client.context.new_page.assert_not_called()
                 client.page.screenshot.assert_not_called()
+
+    def test_login_requires_live_identity_and_never_accepts_scan_text(self):
+        client = MagicMock()
+        client.page.url = "https://www.xiaohongshu.com/explore"
+        client._check_captcha.return_value = False
+        client.page.get_by_text.return_value.first.is_visible.return_value = False
+        client.page.locator.return_value.filter.return_value.count.return_value = 0
+        action = MagicMock()
+        action.check_login_status.return_value = (True, None)
+        client.page.evaluate.return_value = False
+        self.assertFalse(network_worker.has_login(client, action))
+        client.page.evaluate.return_value = True
+        self.assertTrue(network_worker.has_login(client, action))
+        client.page.locator.return_value.filter.return_value.count.return_value = 1
+        self.assertFalse(network_worker.has_login(client, action))
+        client.page.url = "https://www.xiaohongshu.com.evil.invalid/explore"
+        self.assertFalse(network_worker.has_login(client, action))
+
+    def test_missing_binding_dependency_reports_failure_without_erasing_profile(self):
+        job = {"profile_id": "00000000-0000-4000-8000-000000000001", "status": "queued", "claim_token": "test"}
+        with patch.object(network_worker, "browser_client_type", side_effect=StopTrial("skill", "missing")), \
+                patch.object(network_worker, "api_request") as report, \
+                patch.object(network_worker, "notify") as notify, patch.object(network_worker, "clear_profile") as clear:
+            self.assertFalse(network_worker.process_binding(job, "test"))
+            self.assertEqual(report.call_args.args[2]["status"], "invalid")
+            notify.assert_called_once()
+            clear.assert_not_called()
+
+    def test_refresh_during_qr_generation_accepts_already_released_lease(self):
+        job = {"profile_id": "00000000-0000-4000-8000-000000000001", "status": "queued", "claim_token": "test"}
+        client = MagicMock()
+        client._check_captcha.return_value = False
+        client.page.get_by_text.return_value.first.is_visible.return_value = False
+        client.page.locator.return_value.filter.return_value.first.screenshot.return_value = b"synthetic"
+        def report(_path, _key, payload):
+            if payload["status"] == "waiting":
+                return {"current": False}
+            self.assertEqual(payload["status"], "expired")
+            raise RuntimeError("released") from network_worker.urllib.error.HTTPError("", 409, "", None, None)
+        with patch.object(network_worker, "browser_client_type", return_value=(lambda **_: client, None, MagicMock(), None)), \
+                patch.object(network_worker, "api_request", side_effect=report), patch.object(network_worker, "clear_profile"):
+            self.assertTrue(network_worker.process_binding(job, "test"))
+            client.close.assert_called_once()
+
+    def test_offline_browser_binding_fixtures(self):
+        # Real pinned selectors, DOM identity checks and response events; every
+        # request is fulfilled in memory, with disposable synthetic profiles.
+        from automation.xhs_course_trial import browser_client_type
+        ready_markup = '<a class="link-wrapper" href="/user/profile/aaaaaaaaaaaaaaaaaaaaaaaa"><span class="channel">我</span></a>'
+        ready_state = "window.__INITIAL_STATE__={user:{userInfo:{guest:false,userId:'aaaaaaaaaaaaaaaaaaaaaaaa'}}};"
+        ready_html = '<script>' + ready_state + '</script>' + ready_markup
+        for scenario, expected in (("ready", "ready"), ("navigation", "ready"),
+                                   ("461", "blocked"), ("471", "blocked"),
+                                   ("security", "blocked"), ("expired", "expired"),
+                                   ("scan_only", "invalid")):
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as directory:
+                profile_id = "00000000-0000-4000-8000-000000000001"
+                root = Path(directory)
+                real_type, feed, login, user = browser_client_type(root / profile_id, allow_images=True)
+                start = real_type.start
+                instances = []
+                def offline_start(client):
+                    start(client)
+                    instances.append(client)
+                    def route(request):
+                        if request.request.url.endswith('/accepted'):
+                            request.fulfill(status=200, content_type='text/html; charset=utf-8', body=ready_html)
+                        elif request.request.url.endswith('/synthetic-access'):
+                            request.fulfill(status=int(scenario), body='')
+                        elif request.request.url == 'https://www.xiaohongshu.com/explore':
+                            transition = {
+                                'ready': "document.body.innerHTML = " + json.dumps(ready_markup) + ";" + ready_state,
+                                'navigation': "location.assign('/accepted');",
+                                '461': "fetch('/synthetic-access');",
+                                '471': "fetch('/synthetic-access');",
+                                'security': "document.title='安全验证';",
+                                'expired': "document.querySelector('#notice').textContent='二维码已失效';",
+                                'scan_only': "document.querySelector('#notice').textContent='扫码成功，请在手机上确认';"
+                            }[scenario]
+                            request.fulfill(status=200, content_type='text/html; charset=utf-8', body="""
+                                <button onclick="document.querySelector('.login-container').hidden=false">登录</button>
+                                <div class="login-container" hidden><img class="qrcode-img"
+                                src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==">
+                                <span id="notice"></span></div><script>function transition(){""" + transition + "}</script>")
+                        else:
+                            request.fulfill(status=404, body='')
+                    client.context.route('**/*', route)
+                    pause = client.page.wait_for_timeout
+                    client.page.wait_for_timeout = lambda _ms: pause(50)
+                reports = []
+                heartbeats = 0
+                def api(_path, _key, payload):
+                    nonlocal heartbeats
+                    safe = {k: v for k, v in payload.items() if k != 'png'}
+                    reports.append(safe)
+                    if payload.get('status') == 'waiting':
+                        instances[0].page.evaluate('setTimeout(transition, 0)')
+                    if payload.get('heartbeat'):
+                        heartbeats += 1
+                    return {'current': not (scenario == 'scan_only' and heartbeats >= 3)}
+                with patch.object(network_worker, 'PROFILES_PATH', root), \
+                        patch.object(real_type, 'start', offline_start), \
+                        patch.object(network_worker, 'browser_client_type', return_value=(real_type, feed, login, user)), \
+                        patch.object(network_worker, 'api_request', side_effect=api), \
+                        patch.object(network_worker, 'read_state', return_value={}), \
+                        patch.object(network_worker, 'halt_worker') as halt:
+                    self.assertEqual(network_worker.process_binding({'profile_id': profile_id,
+                        'claim_token': 'synthetic', 'status': 'queued'}, 'synthetic'), expected != 'blocked')
+                    self.assertEqual(reports[-1]['status'], expected)
+                    self.assertEqual(halt.called, expected == 'blocked')
+                    self.assertEqual((root / profile_id).exists(), expected == 'ready')
+                    self.assertEqual(len(instances), 1)
 
 
 

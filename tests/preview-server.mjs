@@ -11,7 +11,7 @@ import { onRequestPost as report } from '../functions/api/network/worker/binding
 import { onRequestGet as diagnoses, onRequestPost as createDiagnosis } from '../functions/api/diagnoses/index.js';
 import { onRequestPatch as updateDiagnosis } from '../functions/api/diagnoses/[id].js';
 import { onRequestGet as diagnosisImage } from '../functions/api/diagnoses/[id]/images/[imageId].js';
-const { env, call } = await fixture({ after() {} }, false, false);
+const { env, call, db } = await fixture({ after() {} }, false, false);
 const imageObjects = new Map();
 env.BUCKET = {
   async put(key, stream) { imageObjects.set(key, new Uint8Array(await new Response(stream).arrayBuffer())); },
@@ -65,16 +65,18 @@ const longCase = (await call(createDiagnosis, { name: '合成长案例（12轮�
 for (let index = 0; index < 12; index++) await call(updateDiagnosis, { answer: `第${index + 1}次补充的合成记录：` + '记录当时的任务、提示条件和独立表现，不涉及真实学生。'.repeat(12) }, { method: 'PATCH', id: longCase.id });
 let errors = 0;
 let authenticated = true;
+let bindingMode = 'ready';
 const routes = { '/api/profile': { GET: profile }, '/api/network/binding': { GET: bindingGet, POST: bindingPost },
   '/api/network/accounts': { GET: accounts, POST: add }, '/api/network/searches': { GET: searches, POST: search },
   '/api/diagnoses': { GET: diagnoses, POST: createDiagnosis } };
 createServer(async (incoming, outgoing) => {
   const url = new URL(incoming.url, 'http://127.0.0.1:8788');
   let response;
-  if (url.pathname === '/mobile') response = new Response('<iframe title="390px 页面" src="/" style="width:390px;height:844px;border:1px solid #ccc"></iframe>');
+  if (url.pathname === '/mobile') response = new Response('<iframe title="390px 页面" src="/?binding=' + (['ready','blocked','expired'].includes(url.searchParams.get('binding')) ? url.searchParams.get('binding') : 'ready') + '" style="width:390px;height:844px;border:1px solid #ccc"></iframe>');
   else if (url.pathname === '/favicon.ico') response = new Response(null, { status: 204 });
   else if (url.pathname === '/' || url.pathname === '/login' || url.pathname === '/screenshot') {
     authenticated = url.pathname !== '/login';
+    bindingMode = ['ready','blocked','expired'].includes(url.searchParams.get('binding')) ? url.searchParams.get('binding') : 'ready';
     const screenshotSetup = url.pathname === '/screenshot' ? `
       window.addEventListener('load', async () => {
         document.getElementById('diagnosisNav').click();
@@ -155,9 +157,17 @@ createServer(async (incoming, outgoing) => {
         else {
           await call(report, { profile_id: job.profile_id, claim_token: job.claim_token, status: 'waiting',
             png: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==' }, { worker: true });
-          setTimeout(() => call(report, { profile_id: job.profile_id, claim_token: job.claim_token, status: 'ready' }, { worker: true }), 15000);
+          const outcome = bindingMode;
+          if (outcome === 'expired') {
+            db.sql.prepare('UPDATE network_bindings SET expires_at=? WHERE profile_id=?')
+              .run(new Date(Date.now() + 5000).toISOString(), job.profile_id);
+            setTimeout(() => call(report, { profile_id: job.profile_id, claim_token: job.claim_token,
+              status: 'expired' }, { worker: true }), 5000);
+          }
+          else setTimeout(() => call(report, { profile_id: job.profile_id, claim_token: job.claim_token,
+            status: outcome === 'blocked' ? 'blocked' : 'ready' }, { worker: true }), 7000);
         }
-      }, 500);
+      }, 2500);
     }
   } else response = new Response('Not found', { status: 404 });
   outgoing.writeHead(response.status, Object.fromEntries(response.headers));

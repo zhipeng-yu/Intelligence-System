@@ -1152,13 +1152,14 @@
       const data = await (await apiFetch('/api/network/binding')).json();
       if (requested !== bindingRequest) return;
       const binding = data.binding;
-      const labels = { unbound: '未绑定', queued: '排队生成二维码', waiting: '等待扫码（两分钟内有效）',
+      const status = data.halted ? 'blocked' : binding.status;
+      const labels = { unbound: '未绑定', queued: '等待工作器接单，接单后才会生成二维码', waiting: '等待小红书网页版确认登录（两分钟内有效）',
         ready: '已绑定', expired: '二维码已过期，请重新生成', invalid: '登录失效，请重新绑定或联系管理员',
-        blocked: '安全验证已阻断，请联系管理员人工恢复', unbinding: '正在清理你的登录状态' };
-      document.querySelector('#bindingStatus').textContent = labels[binding.status] || '状态未知';
-      if (binding.status !== 'waiting' || Date.parse(binding.expires_at) <= Date.now()) {
+        blocked: '小红书网页版登录或安全验证未通过，工作器已停止。请联系管理员处理，勿反复扫码', unbinding: '正在清理你的登录状态' };
+      document.querySelector('#bindingStatus').textContent = labels[status] || '状态未知';
+      if (status !== 'waiting' || Date.parse(binding.expires_at) <= Date.now()) {
         clearBindingImage();
-        if (!['queued', 'waiting'].includes(binding.status)) bindingKey = null;
+        if (!['queued', 'waiting'].includes(status)) bindingKey = null;
       } else if (bindingKey && binding.request_id === bindingRequest && binding.challenge
           && bindingImageRequest !== binding.request_id) {
         const decode = value => Uint8Array.from(atob(value), c => c.charCodeAt(0));
@@ -1178,7 +1179,7 @@
         }, Math.max(0, Date.parse(binding.expires_at) - Date.now()));
       }
       clearTimeout(bindingTimer);
-      if (['queued', 'waiting', 'unbinding'].includes(binding.status)) {
+      if (['queued', 'waiting', 'unbinding'].includes(status)) {
         bindingTimer = setTimeout(() => refreshBinding().catch(() => {
           clearBindingImage(); bindingKey = null;
           document.querySelector('#bindingStatus').textContent = '状态读取失败，请刷新状态';

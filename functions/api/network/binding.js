@@ -25,7 +25,8 @@ export const onRequestGet = withUser(async ({ request, env, user }) => {
   const row = await env.DB.prepare(`SELECT status, request_id, owner_session_hash,
     challenge_json, expires_at FROM network_bindings WHERE user_id = ?1`).bind(user.id).first();
   const owner = row?.owner_session_hash === await sha256Hex(sessionToken(request));
-  return json({ binding: { status: row?.status || 'unbound', request_id: row?.request_id || null,
+  const control = await env.DB.prepare('SELECT halted FROM network_worker_control WHERE id = 1').first();
+  return json({ halted: Boolean(control?.halted), binding: { status: row?.status || 'unbound', request_id: row?.request_id || null,
     expires_at: row?.expires_at || null,
     challenge: owner && row.status === 'waiting' && row.challenge_json ? JSON.parse(row.challenge_json) : null } });
 });

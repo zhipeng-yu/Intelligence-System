@@ -34,6 +34,20 @@ class BrowserTest(unittest.TestCase):
             self.assertEqual(launch.call_args.kwargs['user_data_dir'], str(profile))
             self.assertNotIn('user_agent', launch.call_args.kwargs)
             context.add_init_script.assert_not_called()
+            observer = context.on.call_args.args[1]
+            for host, resource, status, expected in (
+                ('www.xiaohongshu.com', 'xhr', 461, True),
+                ('edith.xiaohongshu.com', 'fetch', 471, True),
+                ('www.xiaohongshu.com', 'xhr', 200, False),
+                ('www.xiaohongshu.com', 'image', 461, False),
+                ('xiaohongshu.com.evil.invalid', 'xhr', 461, False)):
+                client.access_refused = False
+                response = MagicMock(url=f'https://{host}/synthetic', status=status)
+                response.request.resource_type = resource
+                observer(response)
+                self.assertEqual(client.access_refused, expected)
+                response.body.assert_not_called()
+                response.json.assert_not_called()
             history = profile / 'Default' / 'History'
             history.parent.mkdir()
             history.write_text('test history', encoding='utf-8')

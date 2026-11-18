@@ -184,6 +184,17 @@ def browser_client_type(profile_path: Path, *, allow_images: bool = False):
             )
             self.page = self.context.pages[0] if self.context.pages else self.context.new_page()
             self.page.set_default_timeout(self.timeout)
+            self.access_refused = False
+            self.context.on("response", self._observe_access)
+
+        def _observe_access(self, response):
+            # Only retain a boolean, never response bodies, URLs, headers or tokens.
+            from urllib.parse import urlsplit
+            host = urlsplit(response.url).hostname or ""
+            if (host == "xiaohongshu.com" or host.endswith(".xiaohongshu.com")) \
+                    and response.request.resource_type in {"document", "xhr", "fetch"} \
+                    and response.status in {461, 471}:
+                self.access_refused = True
 
         def close(self):
             try:
@@ -207,17 +218,18 @@ def browser_client_type(profile_path: Path, *, allow_images: bool = False):
                     if path.is_file():
                         path.unlink(missing_ok=True)
 
-        def navigate(self, url: str, wait_until: str = "domcontentloaded"):
+        def navigate(self, url: str, wait_until: str = "domcontentloaded", *, wait_for_idle: bool = True):
             elapsed = time.monotonic() - self._last_navigate_time
             if self._last_navigate_time and elapsed < 3:
                 time.sleep(3 - elapsed)
             self.page.goto(url, wait_until=wait_until)
             self._last_navigate_time = time.monotonic()
             self._navigate_count += 1
-            try:
-                self.page.wait_for_load_state("networkidle", timeout=8000)
-            except Exception:
-                pass
+            if wait_for_idle:
+                try:
+                    self.page.wait_for_load_state("networkidle", timeout=8000)
+                except Exception:
+                    pass
             if self._check_captcha():
                 raise StopTrial("security", "小红书要求验证，需在浏览器中人工处理")
 

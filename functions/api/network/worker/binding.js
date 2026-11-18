@@ -1,4 +1,5 @@
 import { isWorker, json, sha256Hex, withDatabase } from '../../../_shared.js';
+import { expireBindings } from '../binding.js';
 
 const bytes = value => Uint8Array.from(atob(value), c => c.charCodeAt(0));
 const base64 = value => btoa(String.fromCharCode(...new Uint8Array(value)));
@@ -10,6 +11,7 @@ export const onRequestPost = withDatabase(async ({ request, env }) => {
   if (typeof body?.claim_token !== 'string' || body.claim_token.length > 100) return json({ error: '租约无效。' }, 409);
   const hash = await sha256Hex(body.claim_token);
   const now = new Date().toISOString();
+  await expireBindings(env, now);
   const row = await env.DB.prepare(`SELECT binding.*, user.enabled,
     EXISTS (SELECT 1 FROM sessions WHERE token_hash = binding.owner_session_hash AND user_id = binding.user_id AND expires_at > ?3) AS owner_active
     FROM network_bindings AS binding
@@ -19,8 +21,15 @@ export const onRequestPost = withDatabase(async ({ request, env }) => {
   if (!row) return json({ error: '租约已失效。' }, 409);
   const current = row.enabled === 1 && (row.status === 'unbinding' || row.owner_active === 1) && row.request_id === row.lease_request_id
     && ['queued','waiting','unbinding'].includes(row.status);
-  if (body.status === 'blocked') await env.DB.prepare(`UPDATE network_worker_control
-    SET halted = 1, halt_reason = 'security_blocked', updated_at = ?1 WHERE id = 1`).bind(now).run();
+  if (body.status === 'blocked') {
+    await env.DB.prepare(`UPDATE network_worker_control
+      SET halted = 1, halt_reason = 'security_blocked', updated_at = ?1 WHERE id = 1`).bind(now).run();
+    // Stop displaying the QR before browser cleanup, keeping the serial lease.
+    await env.DB.prepare(`UPDATE network_bindings SET status = 'blocked', challenge_json = NULL,
+      public_key = NULL, owner_session_hash = NULL, expires_at = NULL
+      WHERE profile_id = ?1 AND lease_token_hash = ?2 AND request_id = lease_request_id
+        AND status IN ('queued','waiting')`).bind(body.profile_id, hash).run();
+  }
   if (body.heartbeat === true) return json({ current });
   if (!current) {
     await env.DB.prepare(`UPDATE network_bindings SET lease_token_hash = NULL,

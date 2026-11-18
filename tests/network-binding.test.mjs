@@ -79,11 +79,35 @@ test('binding security blocks all work; legacy workers cannot claim any task', a
   await requestBinding(call, 1);
   assert.equal((await call(claim, {}, { worker: true })).status, 409);
   const job = (await take(call)).data.job;
+  await update(call, job, { status: 'waiting', png: Buffer.from([137,80,78,71,13,10,26,10]).toString('base64') });
+  await update(call, job, { status: 'blocked', heartbeat: true });
+  const stopped = (await call(status, undefined, { method: 'GET' })).data;
+  assert.equal(stopped.halted, true);
+  assert.equal(stopped.binding.status, 'blocked');
+  assert.equal(stopped.binding.challenge, null);
+  const row = db.sql.prepare("SELECT * FROM network_bindings WHERE user_id='u0'").get();
+  assert.ok(row.lease_token_hash);
+  assert.equal(row.public_key, null);
+  assert.equal(row.owner_session_hash, null);
   await update(call, job, { status: 'blocked' });
+  assert.equal(db.sql.prepare("SELECT lease_token_hash FROM network_bindings WHERE user_id='u0'").get().lease_token_hash, null);
   assert.equal((await take(call)).data.halted, true);
   assert.equal(db.sql.prepare("SELECT status FROM network_bindings WHERE user_id='u1'").get().status, 'queued');
   assert.equal((await call(claim, { user_sessions: true, resume: true, profile_id: job.profile_id }, { worker: true })).status, 200);
   assert.equal((await take(call)).data.job.user_id, 'u1');
+});
+
+test('a late successful login cannot bind after QR expiry even without a user poll', async t => {
+  const { db, call } = await fixture(t, false, false);
+  await requestBinding(call);
+  const job = (await take(call)).data.job;
+  await update(call, job, { status: 'waiting', png: Buffer.from([137,80,78,71,13,10,26,10]).toString('base64') });
+  db.sql.prepare("UPDATE network_bindings SET expires_at='2000-01-01' WHERE user_id='u0'").run();
+  assert.equal((await update(call, job, { status: 'ready' })).data.current, false);
+  const row = db.sql.prepare("SELECT status,challenge_json,lease_token_hash FROM network_bindings WHERE user_id='u0'").get();
+  assert.equal(row.status, 'expired');
+  assert.equal(row.challenge_json, null);
+  assert.equal(row.lease_token_hash, null);
 });
 
 test('queued account work waits for rebinding and never uses a disabled user profile', async t => {

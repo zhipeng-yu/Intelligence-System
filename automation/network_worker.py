@@ -93,6 +93,8 @@ USER_SEARCH_ROWS = r"""() => {
 
 
 def security_guard(client) -> None:
+    if getattr(client, "access_refused", False) is True:
+        raise WorkerBlocked("小红书网页版拒绝访问，需人工处理，请勿反复扫码")
     if client._check_captcha():
         raise WorkerBlocked("小红书需要人工安全验证")
     for text in ("安全验证", "请完成验证", "拖动滑块"):
@@ -483,41 +485,90 @@ def clear_profile(profile_id: str) -> None:
         shutil.rmtree(path)
 
 
+def has_login(client, action, *, navigate=False) -> bool:
+    security_guard(client)
+    action.check_login_status(navigate=navigate)
+    security_guard(client)
+    if not client.page.url.startswith("https://www.xiaohongshu.com/"):
+        return False
+    if client.page.locator(action.QRCODE_SELECTOR).filter(visible=True).count():
+        return False
+    # Require the non-guest identity AND its visible self link in either sidebar layout.
+    return client.page.evaluate(r"""() => {
+        const raw = window.__INITIAL_STATE__?.user?.userInfo;
+        const user = raw?.value ?? raw?._value ?? raw;
+        if (user?.guest !== false || !/^[a-f0-9]{24}$/.test(user.userId)) return false;
+        return [...document.querySelectorAll('a[href]')].some(a =>
+            a.origin === location.origin && a.pathname === '/user/profile/' + user.userId &&
+            a.getClientRects().length && a.innerText.trim() === '我');
+    }""") is True
+
+
 def process_binding(job: dict, key: str) -> bool:
     path = profile_path(job["profile_id"])
     def report(**payload):
         return api_request("/api/network/worker/binding", key, {
             "profile_id": job["profile_id"], "claim_token": job["claim_token"], **payload
         })
-    # Refresh/rebind always starts empty; never copy the retired shared profile.
-    clear_profile(job["profile_id"])
     if job["status"] == "unbinding":
+        clear_profile(job["profile_id"])
         report(status="unbound")
         return True
-    browser_client, _, login_action, _ = browser_client_type(path, allow_images=True)
-    client = browser_client(headless=True)
+    try:
+        browser_client, _, login_action, _ = browser_client_type(path, allow_images=True)
+        client = browser_client(headless=True)
+    except (StopTrial, ImportError):
+        # A missing pinned skill is a local setup failure, before any login attempt.
+        report(status="invalid")
+        notify("小红书绑定未启动", "请检查工作器 Conda 环境及固定版本的小红书技能。")
+        return False
+    # Refresh/rebind starts empty after the browser dependencies have been verified.
+    clear_profile(job["profile_id"])
     status = "invalid"
-    deadline = time.monotonic() + 120
+    stale_qr = False
     try:
         client.start()
         action = login_action(client)
-        client.navigate("https://www.xiaohongshu.com/explore")
-        qr = client.page.locator(action.QRCODE_SELECTOR).first
+        client.navigate("https://www.xiaohongshu.com/explore", wait_for_idle=False)
+        security_guard(client)
+        qr = client.page.locator(action.QRCODE_SELECTOR).filter(visible=True).first
+        login_button = client.page.get_by_role("button", name="登录", exact=True).first
+        # The public feed can show a login button before it displays the QR dialog.
+        qr.or_(login_button).first.wait_for(state="visible", timeout=15000)
+        if not qr.is_visible() and login_button.is_visible():
+            security_guard(client)
+            login_button.click(timeout=5000)
         qr.wait_for(state="visible", timeout=15000)
         security_guard(client)
         # Only the QR element, in memory. Never use the skill's shared QR file
         # or its full-page screenshot fallback.
         response = report(status="waiting", png=base64.b64encode(qr.screenshot()).decode("ascii"))
+        stale_qr = response.get("current") is False
+        deadline = time.monotonic() + 120
+        dialog = client.page.locator(".login-container")
+        expired = dialog.get_by_text(re.compile(r"二维码已(?:失效|过期)")).first
         while response.get("current") and time.monotonic() < deadline:
-            security_guard(client)
             response = report(heartbeat=True)
             if not response.get("current"):
+                stale_qr = True
                 break
-            logged_in, _ = action.check_login_status(navigate=False)
+            try:
+                logged_in = has_login(client, action)
+            except Exception as error:
+                # Confirming on the phone can reload the page mid-inspection.
+                if "Execution context was destroyed" not in str(error):
+                    raise
+                continue
             if logged_in:
+                security_guard(client)
                 status = "ready"
                 break
-            time.sleep(3)
+            if expired.is_visible():
+                status = "expired"
+                break
+            # route() needs Playwright's event loop to service the login page's
+            # network requests while the phone is scanning.
+            client.page.wait_for_timeout(2000)
         else:
             status = "expired"
     except (WorkerBlocked, StopTrial):
@@ -530,19 +581,32 @@ def process_binding(job: dict, key: str) -> bool:
         else:
             status = "invalid"
     finally:
+        if status == "blocked":
+            halt_worker(read_state(), "security", "小红书网页版登录未通过，需人工处理，请勿反复扫码")
+            try:
+                # Revoke the QR immediately; retain the serial lease until close.
+                report(status="blocked", heartbeat=True)
+            except RuntimeError:
+                pass
         try:
             client.close()
         except Exception:
             status = "blocked"
-        if status == "blocked":
-            halt_worker(read_state(), "security", "小红书绑定需要人工安全验证")
+            halt_worker(read_state(), "security", "小红书网页版登录未通过，需人工处理，请勿反复扫码")
         if status != "ready":
             try:
                 clear_profile(job["profile_id"])
             except Exception:
                 status = "blocked"
                 halt_worker(read_state(), "security", "用户浏览器清理失败，需人工检查")
-    result = report(status=status)
+    try:
+        result = report(status=status)
+    except RuntimeError as error:
+        # A refreshed request can already have released this QR's lease.
+        cause = error.__cause__
+        if stale_qr and status != "blocked" and isinstance(cause, urllib.error.HTTPError) and cause.code == 409:
+            return True
+        raise
     if not result.get("current"):
         clear_profile(job["profile_id"])
     return status != "blocked"
@@ -573,7 +637,7 @@ def run_once() -> bool:
         payload = None
         try:
             client.start()
-            logged_in, _ = login_action(client).check_login_status(navigate=True)
+            logged_in = has_login(client, login_action(client), navigate=True)
             if not logged_in:
                 raise WorkerBlocked("小红书登录已失效，需在浏览器中人工处理")
             if resolving:
@@ -628,14 +692,14 @@ def repair_login(profile_id: str) -> None:
     try:
         client.start()
         action = login_action(client)
-        logged_in, _ = action.check_login_status(navigate=True)
+        logged_in = has_login(client, action, navigate=True)
         if not logged_in:
             notify("网络资料工作器", "请在已打开的浏览器中完成小红书登录")
             deadline = time.monotonic() + 600
             while time.monotonic() < deadline:
                 if client._check_captcha():
                     raise WorkerBlocked("请先在浏览器中完成人工安全验证")
-                logged_in, _ = action.check_login_status(navigate=False)
+                logged_in = has_login(client, action)
                 if logged_in:
                     break
                 time.sleep(2)
