@@ -8,7 +8,7 @@
 
 验证：Node50、Python22通过，其中7种真实本机浏览器离线夹具覆盖成功、跳转成功、461、471、安全验证、平台到期、只有扫码文字；所有请求在内存拦截，无真实小红书请求。Functions构建、全新本地0001～0010迁移通过。内置浏览器以合成数据核对排队、等待、成功/到期/阻断后收码、1280px/390px无横向溢出、三个主导航、键盘可见焦点及无warn/error。`artifacts/school-archive-desktop.png`和`artifacts/network-binding-blocked-mobile.jpg`为本轮离线阻断页面，非生产成功截图。
 
-发布限制：本轮Pages页面/API修复尚未部署，生产仍为下述既有版本。本机源码已修复但保持停机。尝试只读查询生产控制状态时，Wrangler要求当前终端提供Cloudflare认证，因此未查到生产全局blocked状态，也未修改生产D1、Secret或计划任务。后续先由用户在本机完成Cloudflare登录，再发布已有修复并只读核对生产；真实小红书验证必须先明确人工处理步骤，不能直接继续扫码或运行repair-login。双用户隔离、核验与检索真实验收仍待完成。
+2026-11-18 Wrangler 授权后，通过隔离目录直接发布到 Pages 项目 `ledu-school-archive`。Cloudflare 确认 Production/main 部署 `c162238d-72a2-4b87-8617-fa925596c81f` 成功，源码 `a34248c6226173f448928dcee8e4375adb706f21`。正式首页 200，响应与提交中的 `index.html` 逐字节一致，匿名 GET `/api/network/binding` 返回 401。生产最新迁移仍为 `0010`，沿用原绑定和 Secret。部署前后只读核对均为 `halted=0`、`halt_reason=null`，绑定记录为 expired 1、invalid 1、ready 0。本机 `halted=true`，每分钟任务 Disabled。此次未运行工作器或发起真实扫码。
 
 2026-10-12 用户明确“部署”，教学诊断改进已发布：Production/main `a79d3df5-f393-4014-a511-64f93aed9d4d`，应用源码 `aeaa18e`，D1 保持 `0010`。复用既有绑定，未迁移生产或读取/修改 Secret；.codex-tmp 保留，小红书及计划任务未启动。Node48、Python18、Functions构建、全新本地0001～0010通过；正式首页200且与源码逐字节一致，匿名诊断/图片401。已有浏览器登录状态下，原合成C案例的一次真实Ark结论后质疑成功更新并刷新保存，私有图片预览、Enter/Escape焦点、1280px/390px无溢出通过。回应纠正了7人事实、移除80%和后测否定旧数据的判断，但仍残留“超过半数”排查门槛、未给具体延后复查；不能宣称教学质量全面修复。发布证据见 `artifacts/diagnosis-deployment-2026-10-12/report.md`，标准桌面截图现为本次正式站合成案例。
 
@@ -40,7 +40,7 @@ Node 43 项、Python 18 项、Functions 构建与全新本地 0001～0010 迁移
 
 ## 既有生产已发布，待真实使用验收
 
-生产现为本文开头的 UI 版本，D1 保持 `0010`。工作器目录 `D:/Project/ledu_project/Intelligence System` 为当前源码，未跟踪 `.codex-tmp/` 原样保留；`Ledu-Network-Materials-Worker` 仍为 Disabled，等待真实扫码验收后恢复既有每分钟、IgnoreNew 设置。
+生产部署见本文开头的扫码修复记录，D1 保持 `0010`。工作器目录 `D:/Project/ledu_project/Intelligence System` 为当前源码，未跟踪 `.codex-tmp/` 原样保留；`Ledu-Network-Materials-Worker` 仍为 Disabled，等待真实扫码验收后恢复既有每分钟、IgnoreNew 设置。
 
 教学诊断是第三个登录后一级板块：复用既有 Ark AI，从教学人员已发现的现象出发，一次追问一个尚未回答的关键问题，定位主讲老师具体可改行为，给出解决与验证办法；证据不足须明确说明。生产诊断按会话用户隔离；本轮源码仅为诊断图片新增私有 R2 使用，不连接学校资料或网络资料。
 
@@ -68,7 +68,7 @@ Node 8+9+16+6=39项、Python 3+15=18项、Pages Functions构建及全新本地00
 
 ## 剩余真实验收与恢复
 
-1. 当前先解决本文开头的Cloudflare认证与发布，再人工确认官方网页版限制已处理；不要直接重新运行工作器或让用户反复扫码。恢复真实验收后，两个用户分别建立独立profile并完成各自核验/检索；只有网页显示“已绑定”且工作器确认本人登录才计入扫码验收。
+1. 下一步由人工确认小红书官方网页版可正常登录，保持本机停机直至明确恢复。随后分别用两个用户的独立 profile 验收绑定、核验与检索。只有工作器确认网页版为本人登录，且乐读显示“已绑定”，才计入扫码验收。
 2. 验收通过后恢复既有每分钟计划任务并核对Ready、IgnoreNew及空闲轮询。无需重新注册任务。
 3. 安全阻断只由人工 `repair-login --profile-id <内部随机标识>` 处理并显式恢复；该命令同样受本机互斥锁保护。
 4. 教学诊断真实追问与图片结论已完成合成案例验收，详见本文开头。失败提示已在本地模拟验收，未对生产进行故障注入。
